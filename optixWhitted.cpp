@@ -137,20 +137,7 @@ const GeometryData::Sphere g_sphere = {
     { 2.0f, 1.5f, -2.5f }, // center
     1.0f                   // radius
 };
-const SphereShell g_sphere_shell = {
-    { 4.0f, 2.3f, -4.0f }, // center
-    0.96f,                 // radius1
-    1.0f                   // radius2
-};
-const Parallelogram g_floor(
-    make_float3( 32.0f, 0.0f, 0.0f ),    // v1
-    make_float3( 0.0f, 0.0f, 16.0f ),    // v2
-    make_float3( -16.0f, 0.01f, -8.0f )  // anchor
-    );
-const BasicLight g_light = {
-    make_float3( 60.0f, 40.0f, 0.0f ),   // pos
-    make_float3( 1.0f, 1.0f, 1.0f )      // color
-};
+
 
 //------------------------------------------------------------------------------
 //
@@ -267,8 +254,7 @@ void initLaunchParams( WhittedState& state )
 
     state.params.subframe_index = 0u;
 
-    state.params.light = g_light;
-    state.params.ambient_light_color = make_float3( 0.4f, 0.4f, 0.4f );
+
     state.params.max_depth = max_trace;
     state.params.scene_epsilon = 1.e-4f;
 
@@ -291,25 +277,7 @@ static void sphere_bound(float3 center, float radius, float result[6])
     };
 }
 
-static void parallelogram_bound(float3 v1, float3 v2, float3 anchor, float result[6])
-{
-    // v1 and v2 are scaled by 1./length^2.  Rescale back to normal for the bounds computation.
-    const float3 tv1  = v1 / dot( v1, v1 );
-    const float3 tv2  = v2 / dot( v2, v2 );
-    const float3 p00  = anchor;
-    const float3 p01  = anchor + tv1;
-    const float3 p10  = anchor + tv2;
-    const float3 p11  = anchor + tv1 + tv2;
 
-    OptixAabb* aabb = reinterpret_cast<OptixAabb*>(result);
-
-    float3 m_min = fminf( fminf( p00, p01 ), fminf( p10, p11 ));
-    float3 m_max = fmaxf( fmaxf( p00, p01 ), fmaxf( p10, p11 ));
-    *aabb = {
-        m_min.x, m_min.y, m_min.z,
-        m_max.x, m_max.y, m_max.z
-    };
-}
 
 static void buildGas(
     const WhittedState &state,
@@ -392,12 +360,7 @@ void createGeometry( WhittedState &state )
     sphere_bound(
         g_sphere.center, g_sphere.radius,
         reinterpret_cast<float*>(&aabb[0]));
-    sphere_bound(
-        g_sphere_shell.center, g_sphere_shell.radius2,
-        reinterpret_cast<float*>(&aabb[1]));
-    parallelogram_bound(
-        g_floor.v1, g_floor.v2, g_floor.anchor,
-        reinterpret_cast<float*>(&aabb[2]));
+    
 
     CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_aabb
         ), OBJ_COUNT * sizeof( OptixAabb ) ) );
