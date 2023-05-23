@@ -203,62 +203,14 @@ __device__ void phongShade( float3 p_Kd,
     setRadiancePRD(prd);
 }
 
-extern "C" __global__ void __closesthit__checker_radiance()
-{
-    const HitGroupData* sbt_data = (HitGroupData*) optixGetSbtDataPointer();
-    const CheckerPhong &checker = sbt_data->shading.checker;
 
-    float3 Kd, Ka, Ks, Kr;
-    float  phong_exp;
-
-    float2 texcoord = make_float2(
-        int_as_float( optixGetAttribute_3() ),
-        int_as_float( optixGetAttribute_4() ) );
-    float2 t  = texcoord * checker.inv_checker_size;
-    t.x = floorf(t.x);
-    t.y = floorf(t.y);
-
-    int which_check = ( static_cast<int>( t.x ) +
-                        static_cast<int>( t.y ) ) & 1;
-
-    if ( which_check )
-    {
-        Kd = checker.Kd1;
-        Ka = checker.Ka1;
-        Ks = checker.Ks1;
-        Kr = checker.Kr1;
-        phong_exp = checker.phong_exp1;
-    } else
-    {
-        Kd = checker.Kd2;
-        Ka = checker.Ka2;
-        Ks = checker.Ks2;
-        Kr = checker.Kr2;
-        phong_exp = checker.phong_exp2;
-    }
-
-    float3 object_normal = make_float3(
-        int_as_float( optixGetAttribute_0() ),
-        int_as_float( optixGetAttribute_1() ),
-        int_as_float( optixGetAttribute_2() ));
-    float3 world_normal = normalize( optixTransformNormalFromObjectToWorldSpace(object_normal) );
-    float3 ffnormal  = faceforward( world_normal, -optixGetWorldRayDirection(), world_normal );
-    phongShade( Kd, Ka, Ks, Kr, phong_exp, ffnormal );
-}
 
 extern "C" __global__ void __closesthit__metal_radiance()
 {
-    const HitGroupData* sbt_data = (HitGroupData*) optixGetSbtDataPointer();
-    const Phong &phong = sbt_data->shading.metal;
-
-    float3 object_normal = make_float3(
-        int_as_float( optixGetAttribute_0() ),
-        int_as_float( optixGetAttribute_1() ),
-        int_as_float( optixGetAttribute_2() ));
-
-    float3 world_normal = normalize( optixTransformNormalFromObjectToWorldSpace( object_normal ) );
-    float3 ffnormal = faceforward( world_normal, -optixGetWorldRayDirection(), world_normal );
-    phongShade( phong.Kd, phong.Ka, phong.Ks, phong.Kr, phong.phong_exp, ffnormal );
+    RadiancePRD prd;
+    
+    prd.result = make_float3(1.f, 0.f, 0.f);
+    setRadiancePRD(prd);
 }
 
 extern "C" __global__ void __closesthit__full_occlusion()
