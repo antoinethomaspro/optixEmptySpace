@@ -573,28 +573,7 @@ static void createMetalSphereProgram( WhittedState &state, std::vector<OptixProg
     program_groups.push_back(radiance_sphere_prog_group);
     state.radiance_metal_sphere_prog_group = radiance_sphere_prog_group;
 
-    OptixProgramGroup           occlusion_sphere_prog_group;
-    OptixProgramGroupOptions    occlusion_sphere_prog_group_options = {};
-    OptixProgramGroupDesc       occlusion_sphere_prog_group_desc = {};
-    occlusion_sphere_prog_group_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
-        occlusion_sphere_prog_group_desc.hitgroup.moduleIS           = state.sphere_module;
-    occlusion_sphere_prog_group_desc.hitgroup.entryFunctionNameIS    = "__intersection__sphere";
-    occlusion_sphere_prog_group_desc.hitgroup.moduleCH               = state.shading_module;
-    occlusion_sphere_prog_group_desc.hitgroup.entryFunctionNameCH    = "__closesthit__full_occlusion";
-    occlusion_sphere_prog_group_desc.hitgroup.moduleAH               = nullptr;
-    occlusion_sphere_prog_group_desc.hitgroup.entryFunctionNameAH    = nullptr;
-
-    OPTIX_CHECK_LOG( optixProgramGroupCreate(
-        state.context,
-        &occlusion_sphere_prog_group_desc,
-        1,
-        &occlusion_sphere_prog_group_options,
-        log,
-        &sizeof_log,
-        &occlusion_sphere_prog_group ) );
-
-    program_groups.push_back(occlusion_sphere_prog_group);
-    state.occlusion_metal_sphere_prog_group = occlusion_sphere_prog_group;
+   
 }
 
 
@@ -768,11 +747,7 @@ void createSBT( WhittedState &state )
         };
         sbt_idx ++;
 
-        OPTIX_CHECK( optixSbtRecordPackHeader(
-            state.occlusion_metal_sphere_prog_group,
-            &hitgroup_records[sbt_idx] ) );
-        hitgroup_records[ sbt_idx ].data.geometry.sphere = g_sphere;
-        sbt_idx ++;
+    
 
         
 
