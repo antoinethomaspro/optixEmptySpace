@@ -64,7 +64,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
         params.handle,
         ray_origin,
         ray_direction,
-        params.scene_epsilon,
+        0.,
         1e16f,
         0.0f,
         OptixVisibilityMask( 1 ),
