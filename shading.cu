@@ -56,53 +56,6 @@ static __device__ __inline__ void setRadiancePRD( const RadiancePRD &prd )
     optixSetPayload_4( prd.depth );
 }
 
-static __device__ __inline__ OcclusionPRD getOcclusionPRD()
-{
-    OcclusionPRD prd;
-    prd.attenuation.x = int_as_float( optixGetPayload_0() );
-    prd.attenuation.y = int_as_float( optixGetPayload_1() );
-    prd.attenuation.z = int_as_float( optixGetPayload_2() );
-    return prd;
-}
-
-static __device__ __inline__ void setOcclusionPRD( const OcclusionPRD &prd )
-{
-    optixSetPayload_0( float_as_int(prd.attenuation.x) );
-    optixSetPayload_1( float_as_int(prd.attenuation.y) );
-    optixSetPayload_2( float_as_int(prd.attenuation.z) );
-}
-
-static __device__ __inline__ float3
-traceRadianceRay(
-    float3 origin,
-    float3 direction,
-    int depth,
-    float importance)
-{
-    RadiancePRD prd;
-    prd.depth = depth;
-    prd.importance = importance;
-
-    optixTrace(
-        params.handle,
-        origin,
-        direction,
-        params.scene_epsilon,
-        1e16f,
-        0.0f,
-        OptixVisibilityMask( 1 ),
-        OPTIX_RAY_FLAG_NONE,
-        RAY_TYPE_RADIANCE,
-        RAY_TYPE_COUNT,
-        RAY_TYPE_RADIANCE,
-        float3_as_args(prd.result),
-        /* Can't use float_as_int() because it returns rvalue but payload requires a lvalue */
-        reinterpret_cast<unsigned int&>(prd.importance),
-        reinterpret_cast<unsigned int&>(prd.depth) );
-
-    return prd.result;
-}
-
 
 
 extern "C" __global__ void __closesthit__metal_radiance()
