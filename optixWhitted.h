@@ -38,6 +38,26 @@ enum RayType
     RAY_TYPE_COUNT
 };
 
+struct Sphere
+{
+    float3 center;
+    float  radius;
+};
+
+struct SphereHitGroupData
+{
+    Sphere sphere;
+};
+
+struct HitGroupData
+{
+    union
+    {
+      Sphere sphere;
+    } geometry;
+
+};
+
 
 struct BasicLight
 {
@@ -151,22 +171,7 @@ struct CheckerPhong
 };
 
 
-struct HitGroupData
-{
-    union
-    {
-        GeometryData::Sphere sphere;
-        SphereShell          sphere_shell;
-        Parallelogram        parallelogram;
-    } geometry;
 
-    union
-    {
-        Phong           metal;
-        Glass           glass;
-        CheckerPhong    checker;
-    } shading;
-};
 
 
 struct RadiancePRD

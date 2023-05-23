@@ -133,7 +133,7 @@ struct WhittedState
 //------------------------------------------------------------------------------
 
 // Metal sphere, glass sphere, floor, light
-const GeometryData::Sphere g_sphere = {
+const Sphere g_sphere = {
     { 2.0f, 1.5f, -2.5f }, // center
     1.0f                   // radius
 };
@@ -515,7 +515,7 @@ static void createMetalSphereProgram( WhittedState &state, std::vector<OptixProg
     OptixProgramGroupOptions    radiance_sphere_prog_group_options = {};
     OptixProgramGroupDesc       radiance_sphere_prog_group_desc = {};
     radiance_sphere_prog_group_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
-        radiance_sphere_prog_group_desc.hitgroup.moduleIS           = state.sphere_module;
+        radiance_sphere_prog_group_desc.hitgroup.moduleIS           = state.shading_module;
     radiance_sphere_prog_group_desc.hitgroup.entryFunctionNameIS    = "__intersection__sphere";
     radiance_sphere_prog_group_desc.hitgroup.moduleCH               = state.shading_module;
     radiance_sphere_prog_group_desc.hitgroup.entryFunctionNameCH    = "__closesthit__metal_radiance";
@@ -701,13 +701,6 @@ void createSBT( WhittedState &state )
             state.radiance_metal_sphere_prog_group,
             &hitgroup_records[sbt_idx] ) );
         hitgroup_records[ sbt_idx ].data.geometry.sphere = g_sphere;
-        hitgroup_records[ sbt_idx ].data.shading.metal = {
-            { 0.2f, 0.5f, 0.5f },   // Ka
-            { 0.2f, 0.7f, 0.8f },   // Kd
-            { 0.9f, 0.9f, 0.9f },   // Ks
-            { 0.5f, 0.5f, 0.5f },   // Kr
-            64,                     // phong_exp
-        };
         sbt_idx ++;
 
     
