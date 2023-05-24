@@ -35,7 +35,12 @@ enum RayType
 {
     RAY_TYPE_RADIANCE  = 0,
     RAY_TYPE_OCCLUSION = 1,
-    RAY_TYPE_COUNT
+    RAY_TYPE_COUNT = 1
+};
+
+struct HitGroupData
+{
+    // No data needed
 };
 
 struct Sphere
@@ -49,14 +54,14 @@ struct SphereHitGroupData
     Sphere sphere;
 };
 
-struct HitGroupData
-{
-    union
-    {
-      Sphere sphere;
-    } geometry;
+// struct HitGroupData
+// {
+//     union
+//     {
+//       Sphere sphere;
+//     } geometry;
 
-};
+// };
 
 
 struct BasicLight

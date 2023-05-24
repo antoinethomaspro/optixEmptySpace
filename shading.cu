@@ -40,7 +40,7 @@ __constant__ Params params;
 
 extern "C" __global__ void __intersection__sphere()
 {
-    const SphereHitGroupData* hit_group_data = reinterpret_cast<SphereHitGroupData*>( optixGetSbtDataPointer() );
+    //const SphereHitGroupData* hit_group_data = reinterpret_cast<SphereHitGroupData*>( optixGetSbtDataPointer() );
 
     optixReportIntersection(0., 0.);
 }
@@ -74,10 +74,10 @@ static __forceinline__ __device__ void setPayload( float3 p )
 
 
 
-extern "C" __global__ void __closesthit__metal_radiance()
-{
-    setPayload( make_float3(1.f, 0.f, 0.f));
-}
+// extern "C" __global__ void __closesthit__metal_radiance()
+// {
+//     setPayload( make_float3(1.f, 0.f, 0.f));
+// }
 
 extern "C" __global__ void __miss__constant_bg()
 {
@@ -89,5 +89,5 @@ extern "C" __global__ void __miss__constant_bg()
 
 extern "C" __global__ void __closesthit__mesh()
 {
-    setPayload( make_float3(1.f, 0.f, 0.f));
+    setPayload( make_float3(0.f, 1.f, 0.f));
 }

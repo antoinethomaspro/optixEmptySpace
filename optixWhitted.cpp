@@ -91,7 +91,8 @@ struct Record
 
 typedef Record<CameraData>      RayGenRecord;
 typedef Record<MissData>        MissRecord;
-typedef Record<HitGroupData>    HitGroupRecord;
+typedef Record<HitGroupData>   HitGroupSbtRecord;
+
 
 const uint32_t OBJ_COUNT = 3;
 
@@ -115,7 +116,6 @@ struct WhittedState
     OptixProgramGroup           radiance_miss_prog_group  = 0;
     OptixProgramGroup           occlusion_miss_prog_group = 0;
     OptixProgramGroup           radiance_metal_sphere_prog_group  = 0;
-
     OptixProgramGroup           mesh_hit_prog_group = 0;
 
     OptixPipeline               pipeline                  = 0;
@@ -403,7 +403,7 @@ void buildSphereGAS( WhittedState &state )
     //
 
     // Load AABB into device memory
-    OptixAabb   aabb[OBJ_COUNT];
+    OptixAabb   aabb[1];
     CUdeviceptr d_aabb;
 
     sphere_bound(
@@ -412,11 +412,11 @@ void buildSphereGAS( WhittedState &state )
     
 
     CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_aabb
-        ), OBJ_COUNT * sizeof( OptixAabb ) ) );
+        ), 1 * sizeof( OptixAabb ) ) );
     CUDA_CHECK( cudaMemcpy(
                 reinterpret_cast<void*>( d_aabb ),
                 &aabb,
-                OBJ_COUNT * sizeof( OptixAabb ),
+                1 * sizeof( OptixAabb ),
                 cudaMemcpyHostToDevice
                 ) );
 
@@ -445,8 +445,8 @@ void buildSphereGAS( WhittedState &state )
     aabb_input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
     aabb_input.customPrimitiveArray.aabbBuffers   = &d_aabb;
     aabb_input.customPrimitiveArray.flags         = aabb_input_flags;
-    aabb_input.customPrimitiveArray.numSbtRecords = OBJ_COUNT;
-    aabb_input.customPrimitiveArray.numPrimitives = OBJ_COUNT;
+    aabb_input.customPrimitiveArray.numSbtRecords = 1;
+    aabb_input.customPrimitiveArray.numPrimitives = 1;
     aabb_input.customPrimitiveArray.sbtIndexOffsetBuffer         = d_sbt_index;
     aabb_input.customPrimitiveArray.sbtIndexOffsetSizeInBytes    = sizeof( uint32_t );
     aabb_input.customPrimitiveArray.primitiveIndexOffset         = 0;
@@ -586,7 +586,7 @@ static void createMeshProgram( WhittedState &state, std::vector<OptixProgramGrou
         &mesh_hit_prog_group ) );
 
     program_groups.push_back(mesh_hit_prog_group);
-    state.radiance_metal_sphere_prog_group = mesh_hit_prog_group;  
+    state.mesh_hit_prog_group = mesh_hit_prog_group;  
 }
 
 
@@ -644,7 +644,7 @@ void createPipeline( WhittedState &state )
     createModules( state );
     createCameraProgram( state, program_groups );
     createMeshProgram( state, program_groups );
-    createMetalSphereProgram( state, program_groups );
+   // createMetalSphereProgram( state, program_groups );
     createMissProgram( state, program_groups );
 
     // Link program groups to pipeline
@@ -738,43 +738,24 @@ void createSBT( WhittedState &state )
     }
 
     // Hitgroup program record
+
+     
     {
-        const size_t count_records = RAY_TYPE_COUNT * OBJ_COUNT;
-        HitGroupRecord hitgroup_records[count_records];
+            CUdeviceptr hitgroup_record;
+            size_t      hitgroup_record_size = sizeof( HitGroupSbtRecord );
+            CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &hitgroup_record ), hitgroup_record_size ) );
+            HitGroupSbtRecord hg_sbt;
+            OPTIX_CHECK( optixSbtRecordPackHeader( state.mesh_hit_prog_group, &hg_sbt ) );
+            CUDA_CHECK( cudaMemcpy(
+                        reinterpret_cast<void*>( hitgroup_record ),
+                        &hg_sbt,
+                        hitgroup_record_size,
+                        cudaMemcpyHostToDevice
+                        ) );
 
-        // Note: Fill SBT record array the same order like AS is built.
-        int sbt_idx = 0;
-
-        // Metal Sphere
-        OPTIX_CHECK( optixSbtRecordPackHeader(
-            state.radiance_metal_sphere_prog_group,
-            &hitgroup_records[sbt_idx] ) );
-        hitgroup_records[ sbt_idx ].data.geometry.sphere = g_sphere;
-        sbt_idx ++;
-
-    
-
-        
-
-       
-
-        CUdeviceptr d_hitgroup_records;
-        size_t      sizeof_hitgroup_record = sizeof( HitGroupRecord );
-        CUDA_CHECK( cudaMalloc(
-            reinterpret_cast<void**>( &d_hitgroup_records ),
-            sizeof_hitgroup_record*count_records
-        ) );
-
-        CUDA_CHECK( cudaMemcpy(
-            reinterpret_cast<void*>( d_hitgroup_records ),
-            hitgroup_records,
-            sizeof_hitgroup_record*count_records,
-            cudaMemcpyHostToDevice
-        ) );
-
-        state.sbt.hitgroupRecordBase            = d_hitgroup_records;
-        state.sbt.hitgroupRecordCount           = count_records;
-        state.sbt.hitgroupRecordStrideInBytes   = static_cast<uint32_t>( sizeof_hitgroup_record );
+            state.sbt.hitgroupRecordBase          = hitgroup_record;
+            state.sbt.hitgroupRecordStrideInBytes = sizeof( HitGroupSbtRecord );
+            state.sbt.hitgroupRecordCount         = 1;
     }
 }
 
@@ -976,7 +957,8 @@ int main( int argc, char* argv[] )
         // Set up OptiX state
         //
         createContext  ( state );
-        buildSphereGAS  ( state );
+        buildMeshGAS   ( state );
+        //buildSphereGAS ( state );
         createPipeline ( state );
         createSBT      ( state );
 
