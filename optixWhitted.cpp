@@ -109,12 +109,8 @@ struct WhittedState
     OptixProgramGroup           raygen_prog_group         = 0;
     OptixProgramGroup           radiance_miss_prog_group  = 0;
     OptixProgramGroup           occlusion_miss_prog_group = 0;
-    OptixProgramGroup           radiance_glass_sphere_prog_group  = 0;
-    OptixProgramGroup           occlusion_glass_sphere_prog_group = 0;
     OptixProgramGroup           radiance_metal_sphere_prog_group  = 0;
     OptixProgramGroup           occlusion_metal_sphere_prog_group = 0;
-    OptixProgramGroup           radiance_floor_prog_group         = 0;
-    OptixProgramGroup           occlusion_floor_prog_group        = 0;
 
     OptixPipeline               pipeline                  = 0;
     OptixPipelineCompileOptions pipeline_compile_options  = {};
@@ -862,11 +858,7 @@ void cleanupState( WhittedState& state )
     OPTIX_CHECK( optixProgramGroupDestroy ( state.raygen_prog_group       ) );
     OPTIX_CHECK( optixProgramGroupDestroy ( state.radiance_metal_sphere_prog_group ) );
     OPTIX_CHECK( optixProgramGroupDestroy ( state.occlusion_metal_sphere_prog_group ) );
-    OPTIX_CHECK( optixProgramGroupDestroy ( state.radiance_glass_sphere_prog_group ) );
-    OPTIX_CHECK( optixProgramGroupDestroy ( state.occlusion_glass_sphere_prog_group ) );
     OPTIX_CHECK( optixProgramGroupDestroy ( state.radiance_miss_prog_group         ) );
-    OPTIX_CHECK( optixProgramGroupDestroy ( state.radiance_floor_prog_group        ) );
-    OPTIX_CHECK( optixProgramGroupDestroy ( state.occlusion_floor_prog_group       ) );
     OPTIX_CHECK( optixModuleDestroy       ( state.shading_module          ) );
     OPTIX_CHECK( optixModuleDestroy       ( state.geometry_module         ) );
     OPTIX_CHECK( optixModuleDestroy       ( state.camera_module           ) );
