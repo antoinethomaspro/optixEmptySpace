@@ -431,15 +431,15 @@ void buildSphereGAS( WhittedState &state )
     };
     /* TODO: This API cannot control flags for different ray type */
 
-    const uint32_t sbt_index[] = { 0, 1, 2 };
-    CUdeviceptr    d_sbt_index;
+    // const uint32_t sbt_index[] = { 0, 1, 2 };
+    // CUdeviceptr    d_sbt_index;
 
-    CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_sbt_index ), sizeof(sbt_index) ) );
-    CUDA_CHECK( cudaMemcpy(
-        reinterpret_cast<void*>( d_sbt_index ),
-        sbt_index,
-        sizeof( sbt_index ),
-        cudaMemcpyHostToDevice ) );
+    // CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_sbt_index ), sizeof(sbt_index) ) );
+    // CUDA_CHECK( cudaMemcpy(
+    //     reinterpret_cast<void*>( d_sbt_index ),
+    //     sbt_index,
+    //     sizeof( sbt_index ),
+    //     cudaMemcpyHostToDevice ) );
 
     OptixBuildInput aabb_input = {};
     aabb_input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
@@ -447,9 +447,9 @@ void buildSphereGAS( WhittedState &state )
     aabb_input.customPrimitiveArray.flags         = aabb_input_flags;
     aabb_input.customPrimitiveArray.numSbtRecords = 1;
     aabb_input.customPrimitiveArray.numPrimitives = 1;
-    aabb_input.customPrimitiveArray.sbtIndexOffsetBuffer         = d_sbt_index;
-    aabb_input.customPrimitiveArray.sbtIndexOffsetSizeInBytes    = sizeof( uint32_t );
-    aabb_input.customPrimitiveArray.primitiveIndexOffset         = 0;
+    // aabb_input.customPrimitiveArray.sbtIndexOffsetBuffer         = d_sbt_index;
+    // aabb_input.customPrimitiveArray.sbtIndexOffsetSizeInBytes    = sizeof( uint32_t );
+    // aabb_input.customPrimitiveArray.primitiveIndexOffset         = 0;
 
 
     OptixAccelBuildOptions accel_options = {
@@ -534,30 +534,30 @@ static void createCameraProgram( WhittedState &state, std::vector<OptixProgramGr
 
 static void createMetalSphereProgram( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
 {
-    OptixProgramGroup           sphere_hit_program_group;
-    OptixProgramGroupOptions    sphere_hit_program_group_options = {};
-    OptixProgramGroupDesc       sphere_hit_program_group_desc = {};
-    sphere_hit_program_group_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
-        sphere_hit_program_group_desc.hitgroup.moduleIS           = state.shading_module;
-    sphere_hit_program_group_desc.hitgroup.entryFunctionNameIS    = "__intersection__sphere";
-    sphere_hit_program_group_desc.hitgroup.moduleCH               = state.shading_module;
-    sphere_hit_program_group_desc.hitgroup.entryFunctionNameCH    = "__closesthit__metal_radiance";
-    sphere_hit_program_group_desc.hitgroup.moduleAH               = nullptr;
-    sphere_hit_program_group_desc.hitgroup.entryFunctionNameAH    = nullptr;
+    OptixProgramGroup           sphere_hit_prog_group;
+    OptixProgramGroupOptions    sphere_hit_prog_group_options = {};
+    OptixProgramGroupDesc       sphere_hit_prog_group_desc = {};
+    sphere_hit_prog_group_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
+        sphere_hit_prog_group_desc.hitgroup.moduleIS           = state.shading_module;
+    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameIS    = "__intersection__sphere";
+    sphere_hit_prog_group_desc.hitgroup.moduleCH               = state.shading_module;
+    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameCH    = "__closesthit__metal_radiance";
+    sphere_hit_prog_group_desc.hitgroup.moduleAH               = nullptr;
+    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameAH    = nullptr;
 
     char    log[2048];
     size_t  sizeof_log = sizeof( log );
     OPTIX_CHECK_LOG( optixProgramGroupCreate(
         state.context,
-        &sphere_hit_program_group_desc,
+        &sphere_hit_prog_group_desc,
         1,
-        &sphere_hit_program_group_options,
+        &sphere_hit_prog_group_options,
         log,
         &sizeof_log,
-        &sphere_hit_program_group ) );
+        &sphere_hit_prog_group ) );
 
-    program_groups.push_back(sphere_hit_program_group);
-    state.sphere_hit_prog_group = sphere_hit_program_group;  
+    program_groups.push_back(sphere_hit_prog_group);
+    state.sphere_hit_prog_group = sphere_hit_prog_group;  
 }
 
 
@@ -741,9 +741,9 @@ void createSBT( WhittedState &state )
 
      
     {
-            const size_t count_records = 1;
+            const size_t count_records = 2;
 
-            HitGroupSbtRecord hitgroup_records[1];
+            HitGroupSbtRecord hitgroup_records[2];
 
             // Note: Fill SBT record array the same order like AS is built.
             int sbt_idx = 0;
@@ -751,6 +751,9 @@ void createSBT( WhittedState &state )
             //mesh
             OPTIX_CHECK( optixSbtRecordPackHeader(state.mesh_hit_prog_group, &hitgroup_records[sbt_idx] ) );
             sbt_idx++;
+
+            //sphere
+           // OPTIX_CHECK( optixSbtRecordPackHeader(state.sphere_hit_prog_group, &hitgroup_records[sbt_idx] ) );
 
              
 
@@ -975,8 +978,9 @@ int main( int argc, char* argv[] )
         // Set up OptiX state
         //
         createContext  ( state );
+        buildSphereGAS ( state );
         buildMeshGAS   ( state );
-        //buildSphereGAS ( state );
+
         createPipeline ( state );
         createSBT      ( state );
 
