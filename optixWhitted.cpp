@@ -101,16 +101,13 @@ struct WhittedState
     OptixTraversableHandle      gas_handle                = {};
     CUdeviceptr                 d_gas_output_buffer       = {};
 
-    OptixModule                 geometry_module           = 0;
     OptixModule                 camera_module             = 0;
     OptixModule                 shading_module            = 0;
-    OptixModule                 sphere_module             = 0;
 
     OptixProgramGroup           raygen_prog_group         = 0;
     OptixProgramGroup           radiance_miss_prog_group  = 0;
     OptixProgramGroup           occlusion_miss_prog_group = 0;
     OptixProgramGroup           radiance_metal_sphere_prog_group  = 0;
-    OptixProgramGroup           occlusion_metal_sphere_prog_group = 0;
 
     OptixPipeline               pipeline                  = 0;
     OptixPipelineCompileOptions pipeline_compile_options  = {};
@@ -424,20 +421,6 @@ void createModules( WhittedState &state )
 
     {
         size_t      inputSize = 0;
-        const char* input     = sutil::getInputData( OPTIX_SAMPLE_NAME, OPTIX_SAMPLE_DIR, "geometry.cu", inputSize );
-        OPTIX_CHECK_LOG( optixModuleCreateFromPTX(
-            state.context,
-            &module_compile_options,
-            &state.pipeline_compile_options,
-            input,
-            inputSize,
-            log,
-            &sizeof_log,
-            &state.geometry_module ) );
-    }
-
-    {
-        size_t      inputSize = 0;
         const char* input     = sutil::getInputData( OPTIX_SAMPLE_NAME, OPTIX_SAMPLE_DIR, "camera.cu", inputSize );
         OPTIX_CHECK_LOG( optixModuleCreateFromPTX(
             state.context,
@@ -464,19 +447,7 @@ void createModules( WhittedState &state )
             &state.shading_module ) );
     }
 
-    {
-        size_t      inputSize = 0;
-        const char* input     = sutil::getInputData( nullptr, nullptr, "sphere.cu", inputSize );
-        OPTIX_CHECK_LOG( optixModuleCreateFromPTX(
-            state.context,
-            &module_compile_options,
-            &state.pipeline_compile_options,
-            input,
-            inputSize,
-            log,
-            &sizeof_log,
-            &state.sphere_module ) );
-    }
+  
 }
 
 static void createCameraProgram( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
@@ -857,12 +828,9 @@ void cleanupState( WhittedState& state )
     OPTIX_CHECK( optixPipelineDestroy     ( state.pipeline                ) );
     OPTIX_CHECK( optixProgramGroupDestroy ( state.raygen_prog_group       ) );
     OPTIX_CHECK( optixProgramGroupDestroy ( state.radiance_metal_sphere_prog_group ) );
-    OPTIX_CHECK( optixProgramGroupDestroy ( state.occlusion_metal_sphere_prog_group ) );
     OPTIX_CHECK( optixProgramGroupDestroy ( state.radiance_miss_prog_group         ) );
     OPTIX_CHECK( optixModuleDestroy       ( state.shading_module          ) );
-    OPTIX_CHECK( optixModuleDestroy       ( state.geometry_module         ) );
     OPTIX_CHECK( optixModuleDestroy       ( state.camera_module           ) );
-    OPTIX_CHECK( optixModuleDestroy       ( state.sphere_module           ) );
     OPTIX_CHECK( optixDeviceContextDestroy( state.context                 ) );
 
 
