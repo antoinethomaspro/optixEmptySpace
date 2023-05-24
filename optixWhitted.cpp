@@ -95,6 +95,13 @@ typedef Record<HitGroupData>    HitGroupRecord;
 
 const uint32_t OBJ_COUNT = 3;
 
+struct GeometryAccelData
+{
+    OptixTraversableHandle handle;
+    CUdeviceptr d_output_buffer;
+    uint32_t num_sbt_records;
+};
+
 struct WhittedState
 {
     OptixDeviceContext          context                   = 0;
@@ -284,19 +291,19 @@ static void buildGas(
     OptixAccelBufferSizes gas_buffer_sizes;
     CUdeviceptr d_temp_buffer_gas;
 
-    OPTIX_CHECK( optixAccelComputeMemoryUsage(
+    OPTIX_CHECK( optixAccelComputeMemoryUsage(   //OK ON TOUCHE PLUS
         state.context,
         &accel_options,
         &build_input,
         1,
         &gas_buffer_sizes));
 
-    CUDA_CHECK( cudaMalloc(
+    CUDA_CHECK( cudaMalloc(                                             //OK
         reinterpret_cast<void**>( &d_temp_buffer_gas ),
         gas_buffer_sizes.tempSizeInBytes));
 
     // non-compacted output and size of compacted GAS
-    CUdeviceptr d_buffer_temp_output_gas_and_compacted_size;
+    CUdeviceptr d_buffer_temp_output_gas_and_compacted_size;                                        //ok
     size_t compactedSizeOffset = roundUp<size_t>( gas_buffer_sizes.outputSizeInBytes, 8ull );
     CUDA_CHECK( cudaMalloc(
                 reinterpret_cast<void**>( &d_buffer_temp_output_gas_and_compacted_size ),
@@ -378,12 +385,15 @@ void buildMeshGAS( WhittedState &state)
             triangle_input.triangleArray.flags         = triangle_input_flags;
             triangle_input.triangleArray.numSbtRecords = 1;
 
-            // We can now free the scratch space buffer used during build and the vertex
-            // inputs, since they are not needed by our trivial shading method
-            CUDA_CHECK( cudaFree( reinterpret_cast<void*>( d_temp_buffer_gas ) ) );
-            CUDA_CHECK( cudaFree( reinterpret_cast<void*>( d_vertices        ) ) );
+            
 
-    buildGAS(state, gas, mesh_input);
+
+     buildGas(
+        state,
+        accel_options,
+        triangle_input,
+        state.gas_handle,
+        state.d_gas_output_buffer);
 }
 
 void buildSphereGAS( WhittedState &state )

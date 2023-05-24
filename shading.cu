@@ -86,3 +86,8 @@ extern "C" __global__ void __miss__constant_bg()
     prd.result = sbt_data->bg_color;
     setRadiancePRD(prd);
 }
+
+extern "C" __global__ void __closesthit__mesh()
+{
+    setPayload( make_float3(1.f, 0.f, 0.f));
+}
