@@ -109,6 +109,8 @@ struct WhittedState
     OptixProgramGroup           occlusion_miss_prog_group = 0;
     OptixProgramGroup           radiance_metal_sphere_prog_group  = 0;
 
+    OptixProgramGroup           mesh_hit_prog_group = 0;
+
     OptixPipeline               pipeline                  = 0;
     OptixPipelineCompileOptions pipeline_compile_options  = {};
 
@@ -271,7 +273,6 @@ static void sphere_bound(float3 center, float radius, float result[6])
 }
 
 
-
 static void buildGas(
     const WhittedState &state,
     const OptixAccelBuildOptions &accel_options,
@@ -340,7 +341,52 @@ static void buildGas(
     }
 }
 
-void createGeometry( WhittedState &state )
+void buildMeshGAS( WhittedState &state)
+{
+    // Use default options for simplicity.  In a real use case we would want to
+            // enable compaction, etc
+            OptixAccelBuildOptions accel_options = {
+        OPTIX_BUILD_FLAG_ALLOW_COMPACTION,  // buildFlags
+        OPTIX_BUILD_OPERATION_BUILD         // operation
+    };
+
+            // Triangle build input: simple list of three vertices
+            const std::array<float3, 3> vertices =
+            { {
+                  { -0.5f, -0.5f, 0.0f },
+                  {  0.5f, -0.5f, 0.0f },
+                  {  0.0f,  0.5f, 0.0f }
+            } };
+
+            const size_t vertices_size = sizeof( float3 )*vertices.size();
+            CUdeviceptr d_vertices=0;
+            CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_vertices ), vertices_size ) );
+            CUDA_CHECK( cudaMemcpy(
+                        reinterpret_cast<void*>( d_vertices ),
+                        vertices.data(),
+                        vertices_size,
+                        cudaMemcpyHostToDevice
+                        ) );
+
+            // Our build input is a simple list of non-indexed triangle vertices
+            const uint32_t triangle_input_flags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
+            OptixBuildInput triangle_input = {};
+            triangle_input.type                        = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+            triangle_input.triangleArray.vertexFormat  = OPTIX_VERTEX_FORMAT_FLOAT3;
+            triangle_input.triangleArray.numVertices   = static_cast<uint32_t>( vertices.size() );
+            triangle_input.triangleArray.vertexBuffers = &d_vertices;
+            triangle_input.triangleArray.flags         = triangle_input_flags;
+            triangle_input.triangleArray.numSbtRecords = 1;
+
+            // We can now free the scratch space buffer used during build and the vertex
+            // inputs, since they are not needed by our trivial shading method
+            CUDA_CHECK( cudaFree( reinterpret_cast<void*>( d_temp_buffer_gas ) ) );
+            CUDA_CHECK( cudaFree( reinterpret_cast<void*>( d_vertices        ) ) );
+
+    buildGAS(state, gas, mesh_input);
+}
+
+void buildSphereGAS( WhittedState &state )
 {
     //
     // Build Custom Primitives
@@ -501,11 +547,37 @@ static void createMetalSphereProgram( WhittedState &state, std::vector<OptixProg
         &radiance_sphere_prog_group ) );
 
     program_groups.push_back(radiance_sphere_prog_group);
-    state.radiance_metal_sphere_prog_group = radiance_sphere_prog_group;
-
-   
+    state.radiance_metal_sphere_prog_group = radiance_sphere_prog_group;  
 }
 
+
+static void createMeshProgram( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
+{
+    OptixProgramGroup           mesh_hit_prog_group;
+    OptixProgramGroupOptions    mesh_hit_prog_group_options = {};
+    OptixProgramGroupDesc       mesh_hit_prog_group_desc = {};
+    mesh_hit_prog_group_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
+    mesh_hit_prog_group_desc.hitgroup.moduleCH               = state.shading_module;
+    mesh_hit_prog_group_desc.hitgroup.entryFunctionNameCH    = "__closesthit__mesh";
+    mesh_hit_prog_group_desc.hitgroup.moduleIS               = nullptr;
+    mesh_hit_prog_group_desc.hitgroup.entryFunctionNameIS    = nullptr;
+    mesh_hit_prog_group_desc.hitgroup.moduleAH               = nullptr;
+    mesh_hit_prog_group_desc.hitgroup.entryFunctionNameAH    = nullptr;
+
+     char    log[2048];
+    size_t  sizeof_log = sizeof( log );
+    OPTIX_CHECK_LOG( optixProgramGroupCreate(
+        state.context,
+        &mesh_hit_prog_group_desc,
+        1,
+        &mesh_hit_prog_group_options,
+        log,
+        &sizeof_log,
+        &mesh_hit_prog_group ) );
+
+    program_groups.push_back(mesh_hit_prog_group);
+    state.radiance_metal_sphere_prog_group = mesh_hit_prog_group;  
+}
 
 
 static void createMissProgram( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
@@ -561,7 +633,7 @@ void createPipeline( WhittedState &state )
     // Prepare program groups
     createModules( state );
     createCameraProgram( state, program_groups );
-    
+    createMeshProgram( state, program_groups );
     createMetalSphereProgram( state, program_groups );
     createMissProgram( state, program_groups );
 
@@ -894,7 +966,7 @@ int main( int argc, char* argv[] )
         // Set up OptiX state
         //
         createContext  ( state );
-        createGeometry  ( state );
+        buildSphereGAS  ( state );
         createPipeline ( state );
         createSBT      ( state );
 
