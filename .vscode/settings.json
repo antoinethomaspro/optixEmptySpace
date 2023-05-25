@@ -1,6 +1,10 @@
 {
     "files.associations": {
         "locale": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "array": "cpp",
+        "string_view": "cpp",
+        "iterator": "cpp",
+        "vector": "cpp"
     }
 }

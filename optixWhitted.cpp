@@ -279,6 +279,90 @@ static void sphere_bound(float3 center, float radius, float result[6])
     };
 }
 
+static void buildMesh( const WhittedState &state,
+   
+    OptixTraversableHandle &gas_handle,
+    CUdeviceptr &d_gas_output_buffer)
+
+    
+{
+    // Use default options for simplicity.  In a real use case we would want to
+    // enable compaction, etc
+    OptixAccelBuildOptions accel_options = {};
+    accel_options.buildFlags = OPTIX_BUILD_FLAG_NONE;
+    accel_options.operation  = OPTIX_BUILD_OPERATION_BUILD;
+
+    OptixBuildInput triangle_input = {};
+
+
+    const std::array<float3, 3> vertices =
+    { {
+            { -2.5f, -2.5f, 2.0f },
+            {  3.5f, -3.5f, 3.0f },
+            {  4.0f,  4.5f, 4.0f }
+    } };
+
+    const size_t vertices_size = sizeof( float3 )*vertices.size();
+    CUdeviceptr d_vertices=0;
+    CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_vertices ), vertices_size ) );
+    CUDA_CHECK( cudaMemcpy(
+                reinterpret_cast<void*>( d_vertices ),
+                vertices.data(),
+                vertices_size,
+                cudaMemcpyHostToDevice
+                ) );
+
+
+    // Our build input is a simple list of non-indexed triangle vertices
+    const uint32_t triangle_input_flags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
+    triangle_input.type                        = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+    triangle_input.triangleArray.vertexFormat  = OPTIX_VERTEX_FORMAT_FLOAT3;
+    triangle_input.triangleArray.numVertices   = static_cast<uint32_t>( vertices.size() );
+    triangle_input.triangleArray.vertexBuffers = &d_vertices;
+    triangle_input.triangleArray.flags         = triangle_input_flags;
+    triangle_input.triangleArray.numSbtRecords = 1;
+
+    OptixAccelBufferSizes gas_buffer_sizes;
+    OPTIX_CHECK( optixAccelComputeMemoryUsage(
+                state.context,
+                &accel_options,
+                &triangle_input,
+                1, // Number of build inputs
+                &gas_buffer_sizes
+                ) );
+    CUdeviceptr d_temp_buffer_gas;
+    CUDA_CHECK( cudaMalloc(
+                reinterpret_cast<void**>( &d_temp_buffer_gas ),
+                gas_buffer_sizes.tempSizeInBytes
+                ) );
+    CUDA_CHECK( cudaMalloc(
+                reinterpret_cast<void**>( &d_gas_output_buffer ),
+                gas_buffer_sizes.outputSizeInBytes
+                ) );
+
+    OPTIX_CHECK( optixAccelBuild(
+                state.context,
+                0,                  // CUDA stream
+                &accel_options,
+                &triangle_input,
+                1,                  // num build inputs
+                d_temp_buffer_gas,
+                gas_buffer_sizes.tempSizeInBytes,
+                d_gas_output_buffer,
+                gas_buffer_sizes.outputSizeInBytes,
+                &gas_handle,
+                nullptr,            // emitted property list
+                0                   // num emitted properties
+                ) );
+
+    // We can now free the scratch space buffer used during build and the vertex
+    // inputs, since they are not needed by our trivial shading method
+    CUDA_CHECK( cudaFree( reinterpret_cast<void*>( d_temp_buffer_gas ) ) );
+    CUDA_CHECK( cudaFree( reinterpret_cast<void*>( d_vertices        ) ) );
+
+
+}
+
 
 static void buildGas(
     const WhittedState &state,
@@ -741,41 +825,24 @@ void createSBT( WhittedState &state )
 
      
     {
-            const size_t count_records = 2;
-
-            HitGroupSbtRecord hitgroup_records[2];
-
-            // Note: Fill SBT record array the same order like AS is built.
-            int sbt_idx = 0;
-
-            //mesh
-            OPTIX_CHECK( optixSbtRecordPackHeader(state.mesh_hit_prog_group, &hitgroup_records[sbt_idx] ) );
-            sbt_idx++;
-
-            //sphere
-           // OPTIX_CHECK( optixSbtRecordPackHeader(state.sphere_hit_prog_group, &hitgroup_records[sbt_idx] ) );
-
-             
 
 
-
-        CUdeviceptr d_hitgroup_records;
-        size_t      sizeof_hitgroup_record = sizeof( HitGroupSbtRecord );
-        CUDA_CHECK( cudaMalloc(
-            reinterpret_cast<void**>( &d_hitgroup_records ),
-            sizeof_hitgroup_record*count_records
-        ) );
-
+        CUdeviceptr hitgroup_record;
+        size_t      hitgroup_record_size = sizeof( HitGroupSbtRecord );
+        CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &hitgroup_record ), hitgroup_record_size ) );
+        HitGroupSbtRecord hg_sbt;
+        OPTIX_CHECK( optixSbtRecordPackHeader( state.mesh_hit_prog_group, &hg_sbt ) );
         CUDA_CHECK( cudaMemcpy(
-            reinterpret_cast<void*>( d_hitgroup_records ),
-            hitgroup_records,
-            sizeof_hitgroup_record*count_records,
-            cudaMemcpyHostToDevice
-        ) );
+                    reinterpret_cast<void*>( hitgroup_record ),
+                    &hg_sbt,
+                    hitgroup_record_size,
+                    cudaMemcpyHostToDevice
+                    ) );
 
-        state.sbt.hitgroupRecordBase            = d_hitgroup_records;
-        state.sbt.hitgroupRecordCount           = count_records;
-        state.sbt.hitgroupRecordStrideInBytes   = static_cast<uint32_t>( sizeof_hitgroup_record );
+        state.sbt.hitgroupRecordBase            = hitgroup_record;  //ok
+        state.sbt.hitgroupRecordStrideInBytes   = sizeof( HitGroupSbtRecord );
+        state.sbt.hitgroupRecordCount           = 1;
+
     }
     
 }
@@ -978,9 +1045,9 @@ int main( int argc, char* argv[] )
         // Set up OptiX state
         //
         createContext  ( state );
-        buildSphereGAS ( state );
-        buildMeshGAS   ( state );
 
+        buildMesh( state, state.gas_handle, state.d_gas_output_buffer);
+  
         createPipeline ( state );
         createSBT      ( state );
 
