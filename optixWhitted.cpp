@@ -281,6 +281,11 @@ static void sphere_bound(float3 center, float radius, float result[6])
 
 static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle)
 {
+    std::array<float3, 3> arr = {{
+    { -1.5f, -2.5f, 2.0f },
+    {  3.5f, -20.5f, 3.0f},
+    {  1.0f,  1.5f, 1.0f }
+        }};
 
     class TriangleMesh {
     public:
@@ -288,45 +293,63 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     std::vector<int3> index;
         };
 
-    std::array<float3, 3> arr = {{
-   { -1.5f, -2.5f, 2.0f },
-            {  3.5f, -20.5f, 3.0f },
-            {  4.0f,  4.5f, 4.0f }
-        }};
+    TriangleMesh mesh1;
+    mesh1.vertex.insert(mesh1.vertex.end(), arr.begin(), arr.end());
 
-    std::vector<float3> vertex(arr.begin(), arr.end()); 
+    /*! the model we are going to trace rays against */
+    std::vector<TriangleMesh> meshes;
+    /*! one buffer per input mesh */
+    std::vector<CUDABuffer> vertexBuffer;
 
+    meshes.push_back(mesh1);
+
+    vertexBuffer.resize(meshes.size());
     
     OptixTraversableHandle asHandle { 0 };
 
-    CUDABuffer vertexBuffer;
-
-     // upload the model to the device: the builder
-    vertexBuffer.alloc_and_upload(vertex);
-    
+    // ==================================================================
     // triangle inputs
-    OptixBuildInput triangleInput = {};
-    triangleInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+    // ==================================================================
+	std::vector<OptixBuildInput> triangleInput(meshes.size());
+    std::vector<CUdeviceptr> d_vertices(meshes.size());
+	// std::vector<CUdeviceptr> d_indices(meshes.size());
+	std::vector<uint32_t> triangleInputFlags(meshes.size());
+
+    for (int meshID=0;meshID<meshes.size();meshID++) {
+    // upload the model to the device: the builder
+    TriangleMesh &model = meshes[meshID];
+    vertexBuffer[meshID].alloc_and_upload(model.vertex);
+    // indexBuffer[meshID].alloc_and_upload(model.index);
+
+    triangleInput[meshID] = {};
+    triangleInput[meshID].type
+      = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
     // create local variables, because we need a *pointer* to the
     // device pointers
-    CUdeviceptr d_vertices = vertexBuffer.d_pointer();
+    d_vertices[meshID] = vertexBuffer[meshID].d_pointer();
+    // d_indices[meshID]  = indexBuffer[meshID].d_pointer();
       
-    triangleInput.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
-    triangleInput.triangleArray.vertexStrideInBytes = sizeof(float3);
-    triangleInput.triangleArray.numVertices         = (int)arr.size();
-    triangleInput.triangleArray.vertexBuffers       = &d_vertices;
-   
+    triangleInput[meshID].triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
+    triangleInput[meshID].triangleArray.vertexStrideInBytes = sizeof(float3);
+    triangleInput[meshID].triangleArray.numVertices         = (int)model.vertex.size();
+    triangleInput[meshID].triangleArray.vertexBuffers       = &d_vertices[meshID];
     
-    uint32_t triangleInputFlags[1] = { 0 };
-
-     // in this example we have one SBT entry, and no per-primitive
+    // triangleInput[meshID].triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+    // triangleInput[meshID].triangleArray.indexStrideInBytes  = sizeof(vec3i);
+    // triangleInput[meshID].triangleArray.numIndexTriplets    = (int)model.index.size();
+    // triangleInput[meshID].triangleArray.indexBuffer         = d_indices[meshID];
+    
+    triangleInputFlags[meshID] = 0 ;
+    
+    // in this example we have one SBT entry, and no per-primitive
     // materials:
-    triangleInput.triangleArray.flags               = triangleInputFlags;
-    triangleInput.triangleArray.numSbtRecords               = 1;
-    triangleInput.triangleArray.sbtIndexOffsetBuffer        = 0; 
-    triangleInput.triangleArray.sbtIndexOffsetSizeInBytes   = 0; 
-    triangleInput.triangleArray.sbtIndexOffsetStrideInBytes = 0; 
+    triangleInput[meshID].triangleArray.flags               = &triangleInputFlags[meshID];
+    triangleInput[meshID].triangleArray.numSbtRecords               = 1;
+    triangleInput[meshID].triangleArray.sbtIndexOffsetBuffer        = 0; 
+    triangleInput[meshID].triangleArray.sbtIndexOffsetSizeInBytes   = 0; 
+    triangleInput[meshID].triangleArray.sbtIndexOffsetStrideInBytes = 0; 
+    }
 
     // ==================================================================
     // BLAS setup
@@ -341,8 +364,8 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     OPTIX_CHECK(optixAccelComputeMemoryUsage
                 ( state.context,
                  &accelOptions,
-                 &triangleInput,
-                 1,  // num_build_inputs
+                 triangleInput.data(),
+                 (int)meshes.size(),  // num_build_inputs
                  &blasBufferSizes
                  ));
 
@@ -371,8 +394,8 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     OPTIX_CHECK(optixAccelBuild(state.context,
                                 /* stream */0,
                                 &accelOptions,
-                                &triangleInput,
-                                1,  
+                                triangleInput.data(),
+                                (int)meshes.size(),  
                                 tempBuffer.d_pointer(),
                                 tempBuffer.sizeInBytes,
                                 
@@ -386,7 +409,7 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     CUDA_SYNC_CHECK();
 
      // ==================================================================
-    // perform compaction
+    // perform compaction ????
     // ==================================================================
    
 
