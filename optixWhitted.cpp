@@ -52,6 +52,13 @@
 #include <cstring>
 
 #include "optixWhitted.h"
+#include "CUDABuffer.h"
+
+ 
+
+
+
+
 
 
 //------------------------------------------------------------------------------
@@ -59,6 +66,7 @@
 // Globals
 //
 //------------------------------------------------------------------------------
+
 
 bool              resize_dirty  = false;
 bool              minimized     = false;
@@ -94,20 +102,12 @@ typedef Record<MissData>        MissRecord;
 typedef Record<HitGroupData>   HitGroupSbtRecord;
 
 
-const uint32_t OBJ_COUNT = 3;
-
-struct GeometryAccelData
-{
-    OptixTraversableHandle handle;
-    CUdeviceptr d_output_buffer;
-    uint32_t num_sbt_records;
-};
-
 struct WhittedState
 {
     OptixDeviceContext          context                   = 0;
     OptixTraversableHandle      gas_handle                = {};
     CUdeviceptr                 d_gas_output_buffer       = {};
+
 
     OptixModule                 camera_module             = 0;
     OptixModule                 shading_module            = 0;
@@ -279,11 +279,141 @@ static void sphere_bound(float3 center, float radius, float result[6])
     };
 }
 
+static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle)
+{
+
+    class TriangleMesh {
+    public:
+    std::vector<float3> vertex;
+    std::vector<int3> index;
+        };
+
+    const std::array<float3, 3> vertices = {{
+    { -2.5f, -2.5f, 2.0f },
+    {  3.5f, -3.5f, 3.0f },
+    {  4.0f,  4.5f, 4.0f }
+            }};
+
+    std::array<float3, 3> arr = {{
+    {1.0f, 2.0f, 3.0f},
+    {4.0f, 5.0f, 6.0f},
+    {7.0f, 8.0f, 9.0f}
+        }};
+
+    std::vector<float3> vertex(arr.begin(), arr.end()); 
+
+    
+    OptixTraversableHandle asHandle { 0 };
+
+    CUDABuffer vertexBuffer;
+
+     // upload the model to the device: the builder
+    vertexBuffer.alloc_and_upload(vertex);
+    
+    // triangle inputs
+    OptixBuildInput triangleInput = {};
+    triangleInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+
+    // create local variables, because we need a *pointer* to the
+    // device pointers
+    CUdeviceptr d_vertices = vertexBuffer.d_pointer();
+      
+    triangleInput.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
+    triangleInput.triangleArray.vertexStrideInBytes = sizeof(float3);
+    triangleInput.triangleArray.numVertices         = (int)vertices.size();
+    triangleInput.triangleArray.vertexBuffers       = &d_vertices;
+   
+    
+    uint32_t triangleInputFlags[1] = { 0 };
+
+     // in this example we have one SBT entry, and no per-primitive
+    // materials:
+    triangleInput.triangleArray.flags               = triangleInputFlags;
+    triangleInput.triangleArray.numSbtRecords               = 1;
+    triangleInput.triangleArray.sbtIndexOffsetBuffer        = 0; 
+    triangleInput.triangleArray.sbtIndexOffsetSizeInBytes   = 0; 
+    triangleInput.triangleArray.sbtIndexOffsetStrideInBytes = 0; 
+
+    // ==================================================================
+    // BLAS setup
+    // ==================================================================
+    
+    OptixAccelBuildOptions accelOptions = {};
+    accelOptions.buildFlags             = OPTIX_BUILD_FLAG_NONE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
+    accelOptions.motionOptions.numKeys  = 1;
+    accelOptions.operation              = OPTIX_BUILD_OPERATION_BUILD;
+    
+    OptixAccelBufferSizes blasBufferSizes;
+    OPTIX_CHECK(optixAccelComputeMemoryUsage
+                ( state.context,
+                 &accelOptions,
+                 &triangleInput,
+                 1,  // num_build_inputs
+                 &blasBufferSizes
+                 ));
+
+    // ==================================================================
+    // prepare compaction
+    // ==================================================================
+    
+    CUDABuffer compactedSizeBuffer;
+    compactedSizeBuffer.alloc(sizeof(uint64_t));
+    
+    OptixAccelEmitDesc emitDesc;
+    emitDesc.type   = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
+    emitDesc.result = compactedSizeBuffer.d_pointer();
+
+
+    // ==================================================================
+    // execute build (main stage)
+    // ==================================================================
+    
+    CUDABuffer tempBuffer;
+    tempBuffer.alloc(blasBufferSizes.tempSizeInBytes);
+    
+    CUDABuffer outputBuffer;
+    outputBuffer.alloc(blasBufferSizes.outputSizeInBytes);
+      
+    OPTIX_CHECK(optixAccelBuild(state.context,
+                                /* stream */0,
+                                &accelOptions,
+                                &triangleInput,
+                                1,  
+                                tempBuffer.d_pointer(),
+                                tempBuffer.sizeInBytes,
+                                
+                                outputBuffer.d_pointer(),
+                                outputBuffer.sizeInBytes,
+                                
+                                &gas_handle,
+                                
+                                &emitDesc,1
+                                ));
+    CUDA_SYNC_CHECK();
+
+     // ==================================================================
+    // perform compaction
+    // ==================================================================
+    uint64_t compactedSize;
+    compactedSizeBuffer.download(&compactedSize,1);
+
+    CUDABuffer asBuffer;
+    
+    asBuffer.alloc(compactedSize);
+    OPTIX_CHECK(optixAccelCompact(state.context,
+                                  /*stream:*/0,
+                                  asHandle,
+                                  asBuffer.d_pointer(),
+                                  asBuffer.sizeInBytes,
+                                  &asHandle));
+    CUDA_SYNC_CHECK();
+
+}
+
 static void buildMesh( const WhittedState &state,
    
     OptixTraversableHandle &gas_handle,
     CUdeviceptr &d_gas_output_buffer)
-
     
 {
     // Use default options for simplicity.  In a real use case we would want to
@@ -295,12 +425,15 @@ static void buildMesh( const WhittedState &state,
     OptixBuildInput triangle_input = {};
 
 
+
     const std::array<float3, 3> vertices =
     { {
             { -2.5f, -2.5f, 2.0f },
             {  3.5f, -3.5f, 3.0f },
             {  4.0f,  4.5f, 4.0f }
     } };
+
+  
 
     const size_t vertices_size = sizeof( float3 )*vertices.size();
     CUdeviceptr d_vertices=0;
@@ -312,6 +445,7 @@ static void buildMesh( const WhittedState &state,
                 cudaMemcpyHostToDevice
                 ) );
 
+    
 
     // Our build input is a simple list of non-indexed triangle vertices
     const uint32_t triangle_input_flags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
@@ -326,7 +460,7 @@ static void buildMesh( const WhittedState &state,
     OPTIX_CHECK( optixAccelComputeMemoryUsage(
                 state.context,
                 &accel_options,
-                &triangle_input,
+                &triangle_input, //build inputs
                 1, // Number of build inputs
                 &gas_buffer_sizes
                 ) );
@@ -339,6 +473,7 @@ static void buildMesh( const WhittedState &state,
                 reinterpret_cast<void**>( &d_gas_output_buffer ),
                 gas_buffer_sizes.outputSizeInBytes
                 ) );
+                
 
     OPTIX_CHECK( optixAccelBuild(
                 state.context,
