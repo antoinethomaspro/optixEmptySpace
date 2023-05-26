@@ -74,10 +74,10 @@ static __forceinline__ __device__ void setPayload( float3 p )
 
 
 
-// extern "C" __global__ void __closesthit__metal_radiance()
-// {
-//     setPayload( make_float3(1.f, 0.f, 0.f));
-// }
+extern "C" __global__ void __closesthit__mesh2()
+{
+    setPayload( make_float3(1.f, 0.f, 0.f));
+}
 
 extern "C" __global__ void __miss__constant_bg()
 {
