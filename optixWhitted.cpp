@@ -356,8 +356,8 @@ void createGeometry( WhittedState &state )
     // Build Custom Primitives
     //
     const Sphere g_sphere = {
-    { -5.0f, 1.5f, 2.5f }, // center
-    1.0f                   // radius
+    { -13.0f, 9.5f, -5.5f }, // center
+    3.0f                   // radius
         };
 
     // Load AABB into device memory

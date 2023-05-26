@@ -42,7 +42,25 @@ extern "C" __global__ void __intersection__sphere()
 {
     //const SphereHitGroupData* hit_group_data = reinterpret_cast<SphereHitGroupData*>( optixGetSbtDataPointer() );
 
-    optixReportIntersection(0., 0.);
+    const int primID = optixGetPrimitiveIndex();
+
+    optixReportIntersection(0., 0. , primID);
+}
+
+static __forceinline__ __device__ float3 getPayload()
+{
+    return make_float3(
+            int_as_float( optixGetPayload_0() ),
+            int_as_float( optixGetPayload_1() ),
+            int_as_float( optixGetPayload_2() )
+            );
+}
+
+static __forceinline__ __device__ void setPayload( float3 p )
+{
+    optixSetPayload_0( float_as_int( p.x ) );
+    optixSetPayload_1( float_as_int( p.y ) );
+    optixSetPayload_2( float_as_int( p.z ) );
 }
 
 static __device__ __inline__ RadiancePRD getRadiancePRD()
@@ -65,12 +83,7 @@ static __device__ __inline__ void setRadiancePRD( const RadiancePRD &prd )
     optixSetPayload_4( prd.depth );
 }
 
-static __forceinline__ __device__ void setPayload( float3 p )
-{
-    optixSetPayload_0( float_as_int( p.x ) );
-    optixSetPayload_1( float_as_int( p.y ) );
-    optixSetPayload_2( float_as_int( p.z ) );
-}
+
 
 
 
@@ -90,4 +103,29 @@ extern "C" __global__ void __miss__constant_bg()
 extern "C" __global__ void __closesthit__mesh()
 {
     setPayload( make_float3(0.f, 1.f, 0.f));
+}
+
+extern "C" __global__ void __closesthit__ch()
+{
+    float3  payload = getPayload();
+    int primID = optixGetAttribute_0();
+
+    switch(primID){
+        case 0:
+            setPayload( payload + make_float3( 1.f, 0.f, 0.f));
+            break;
+        case 1:
+            setPayload( payload + make_float3( 0.f, 0.05f, 0.f));
+            break;
+        case 2:
+            setPayload( payload + make_float3( 0.f, 0.f, 0.05f));
+            break;
+        case 3:
+            setPayload( payload + make_float3( 0.05, 0.05f, 0.f));
+            break;
+        case 4:
+            setPayload( payload + make_float3( 0.f, 0.05f, 0.05f));
+            break;
+    }
+    
 }

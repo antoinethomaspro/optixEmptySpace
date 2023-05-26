@@ -57,8 +57,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
     float3 ray_direction = normalize(d.x*camera->U + d.y*camera->V + camera->W);
 
     RadiancePRD prd;
-    prd.importance = 1.f;
-    prd.depth = 0;
+   
 
     optixTrace(
         params.handle,
@@ -72,19 +71,23 @@ extern "C" __global__ void __raygen__pinhole_camera()
         RAY_TYPE_RADIANCE,
         RAY_TYPE_COUNT,
         RAY_TYPE_RADIANCE,
-        float3_as_args(prd.result),
-        reinterpret_cast<unsigned int&>(prd.importance),
-        reinterpret_cast<unsigned int&>(prd.depth) );
+        float3_as_args(prd.result) );
 
-    float4 acc_val = params.accum_buffer[image_index];
-    if( params.subframe_index > 0 )
-    {
-        acc_val = lerp( acc_val, make_float4( prd.result, 0.f), 1.0f / static_cast<float>( params.subframe_index+1 ) );
-    }
-    else
-    {
-        acc_val = make_float4(prd.result, 0.f);
-    }
+    // float4 acc_val = params.accum_buffer[image_index];
+    // if( params.subframe_index > 0 )
+    // {
+    //     acc_val = lerp( acc_val, make_float4( prd.result, 0.f), 1.0f / static_cast<float>( params.subframe_index+1 ) );
+    // }
+    // else
+    // {
+    //     acc_val = make_float4(prd.result, 0.f);
+    // }
+
+    // float4 acc_val = params.accum_buffer[image_index];
+
+    float4 acc_val = make_float4(prd.result, 0.f);
+
+
     params.frame_buffer[image_index] = make_color( acc_val );
     params.accum_buffer[image_index] = acc_val;
 }
