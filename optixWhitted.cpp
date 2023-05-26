@@ -115,11 +115,8 @@ struct WhittedState
     OptixProgramGroup           raygen_prog_group         = 0;
     OptixProgramGroup           radiance_miss_prog_group  = 0;
     OptixProgramGroup           occlusion_miss_prog_group = 0;
-    OptixProgramGroup           radiance_metal_sphere_prog_group  = 0;
+    OptixProgramGroup           sphere_hit_prog_group  = 0;
     OptixProgramGroup           mesh_hit_prog_group = 0;
-    OptixProgramGroup           mesh_hit_prog_group2 = 0;
-
-   
 
     OptixPipeline               pipeline                  = 0;
     OptixPipelineCompileOptions pipeline_compile_options  = {};
@@ -139,7 +136,7 @@ struct WhittedState
 
 // Metal sphere, glass sphere, floor, light
 const Sphere g_sphere = {
-    { 0.0f, 0.0f, -2.0f }, // center
+    { 2.0f, 1.5f, -2.5f }, // center
     1.0f                   // radius
 };
 
@@ -269,74 +266,6 @@ void initLaunchParams( WhittedState& state )
     state.params.handle = state.gas_handle;
 }
 
-static void buildGas(
-    const WhittedState &state,
-    const OptixAccelBuildOptions &accel_options,
-    const OptixBuildInput &build_input,
-    OptixTraversableHandle &gas_handle,
-    CUdeviceptr &d_gas_output_buffer
-    )
-{
-    OptixAccelBufferSizes gas_buffer_sizes;
-    CUdeviceptr d_temp_buffer_gas;
-
-    OPTIX_CHECK( optixAccelComputeMemoryUsage(
-        state.context,
-        &accel_options,
-        &build_input,
-        1,
-        &gas_buffer_sizes));
-
-    CUDA_CHECK( cudaMalloc(
-        reinterpret_cast<void**>( &d_temp_buffer_gas ),
-        gas_buffer_sizes.tempSizeInBytes));
-
-    // non-compacted output and size of compacted GAS
-    CUdeviceptr d_buffer_temp_output_gas_and_compacted_size;
-    size_t compactedSizeOffset = roundUp<size_t>( gas_buffer_sizes.outputSizeInBytes, 8ull );
-    CUDA_CHECK( cudaMalloc(
-                reinterpret_cast<void**>( &d_buffer_temp_output_gas_and_compacted_size ),
-                compactedSizeOffset + 8
-                ) );
-
-    OptixAccelEmitDesc emitProperty = {};
-    emitProperty.type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
-    emitProperty.result = (CUdeviceptr)((char*)d_buffer_temp_output_gas_and_compacted_size + compactedSizeOffset);
-
-    OPTIX_CHECK( optixAccelBuild(
-        state.context,
-        0,
-        &accel_options,
-        &build_input,
-        1,
-        d_temp_buffer_gas,
-        gas_buffer_sizes.tempSizeInBytes,
-        d_buffer_temp_output_gas_and_compacted_size,
-        gas_buffer_sizes.outputSizeInBytes,
-        &gas_handle,
-        &emitProperty,
-        1) );
-
-    CUDA_CHECK( cudaFree( (void*)d_temp_buffer_gas ) );
-
-    size_t compacted_gas_size;
-    CUDA_CHECK( cudaMemcpy( &compacted_gas_size, (void*)emitProperty.result, sizeof(size_t), cudaMemcpyDeviceToHost ) );
-
-    if( compacted_gas_size < gas_buffer_sizes.outputSizeInBytes )
-    {
-        CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_gas_output_buffer ), compacted_gas_size ) );
-
-        // use handle as input and output
-        OPTIX_CHECK( optixAccelCompact( state.context, 0, gas_handle, d_gas_output_buffer, compacted_gas_size, &gas_handle ) );
-
-        CUDA_CHECK( cudaFree( (void*)d_buffer_temp_output_gas_and_compacted_size ) );
-    }
-    else
-    {
-        d_gas_output_buffer = d_buffer_temp_output_gas_and_compacted_size;
-    }
-}
-
 static void sphere_bound(float3 center, float radius, float result[6])
 {
     OptixAabb *aabb = reinterpret_cast<OptixAabb*>(result);
@@ -350,99 +279,17 @@ static void sphere_bound(float3 center, float radius, float result[6])
     };
 }
 
-void createGeometry( WhittedState &state )
-{
-    //
-    // Build Custom Primitives
-    //
-    const Sphere g_sphere = {
-    { -0.0f, 0.0f, -5.5f }, // center
-    3.0f                   // radius
-        };
-
-    // Load AABB into device memory
-    OptixAabb   aabb[1];
-    CUdeviceptr d_aabb;
-
-    sphere_bound(
-        g_sphere.center, g_sphere.radius,
-        reinterpret_cast<float*>(&aabb[0]));
-
-
-    CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_aabb
-        ), 1 * sizeof( OptixAabb ) ) );
-    CUDA_CHECK( cudaMemcpy(
-                reinterpret_cast<void*>( d_aabb ),
-                &aabb,
-                1 * sizeof( OptixAabb ),
-                cudaMemcpyHostToDevice
-                ) );
-
-    // Setup AABB build input
-    uint32_t aabb_input_flags[] = {
-        /* flags for metal sphere */
-        OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
-        /* flag for glass sphere */
-        OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL,
-        /* flag for floor */
-        OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
-    };
-    /* TODO: This API cannot control flags for different ray type */
-
-    const uint32_t sbt_index[] = { 0 };
-    CUdeviceptr    d_sbt_index;
-
-    CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_sbt_index ), sizeof(sbt_index) ) );
-    CUDA_CHECK( cudaMemcpy(
-        reinterpret_cast<void*>( d_sbt_index ),
-        sbt_index,
-        sizeof( sbt_index ),
-        cudaMemcpyHostToDevice ) );
-
-    OptixBuildInput aabb_input = {};
-    aabb_input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
-    aabb_input.customPrimitiveArray.aabbBuffers   = &d_aabb;
-    aabb_input.customPrimitiveArray.flags         = aabb_input_flags;
-    aabb_input.customPrimitiveArray.numSbtRecords = 1;
-    aabb_input.customPrimitiveArray.numPrimitives = 1;
-    aabb_input.customPrimitiveArray.sbtIndexOffsetBuffer         = d_sbt_index;
-    aabb_input.customPrimitiveArray.sbtIndexOffsetSizeInBytes    = sizeof( uint32_t );
-    aabb_input.customPrimitiveArray.primitiveIndexOffset         = 0;
-
-
-    OptixAccelBuildOptions accel_options = {
-        OPTIX_BUILD_FLAG_ALLOW_COMPACTION,  // buildFlags
-        OPTIX_BUILD_OPERATION_BUILD         // operation
-    };
-
-
-    buildGas(
-        state,
-        accel_options,
-        aabb_input,
-        state.gas_handle,
-        state.d_gas_output_buffer);
-
-    CUDA_CHECK( cudaFree( (void*)d_aabb) );
-}
-
-
-
-
-
 static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle)
 {
-    std::array<float3, 3> arr = {{
-    { -1.5f, -2.5f, 2.0f },
-    {  3.5f, -20.5f, 3.0f},
-    {  1.0f,  1.5f, 1.0f }
+    std::vector<float3> arr = {{
+    { 0.f, 0.f, 0.0f },
+    { 5.f, 0.f, 0.0f},
+    { 0.0f, 5.f, 0.f},
+    { 0.0f, 0.f, -5.f},
         }};
 
-    std::array<float3, 3> arr2 = { {
-    { -0.5f, -0.5f, 0.0f },
-    {  0.5f, -0.5f, 0.0f },
-    {  0.0f,  0.5f, 0.0f }
-            } };
+    std::vector<int3> indices = { {0, 1, 2}, {0, 2, 3}, {1, 3, 2}, {0,3,1}};
+
 
     class TriangleMesh {
     public:
@@ -450,84 +297,74 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     std::vector<int3> index;
         };
 
-    TriangleMesh mesh1;
-    mesh1.vertex.insert(mesh1.vertex.end(), arr.begin(), arr.end());
+    TriangleMesh model;
+    for (const auto& vertex : arr) {
+    model.vertex.push_back(vertex);
+    }
 
-    TriangleMesh mesh2;
-    mesh2.vertex.insert(mesh2.vertex.end(), arr2.begin(), arr2.end());
-
-    /*! the model we are going to trace rays against */
-    std::vector<TriangleMesh> meshes;
-    /*! one buffer per input mesh */
-    std::vector<CUDABuffer> vertexBuffer;
-
-    meshes.push_back(mesh1);
-    meshes.push_back(mesh2);
+    for (const auto& index : indices) {
+    model.index.push_back(index);
+    }
 
 
-    vertexBuffer.resize(meshes.size());
+    CUDABuffer vertexBuffer;
+    CUDABuffer indexBuffer;
+
+
+    vertexBuffer.alloc_and_upload(model.vertex);
+    indexBuffer.alloc_and_upload(model.index);
+
     
-    OptixTraversableHandle asHandle { 0 };
 
-    // ==================================================================
+     // ==================================================================
     // triangle inputs
     // ==================================================================
-	std::vector<OptixBuildInput> triangleInput(meshes.size());
-    std::vector<CUdeviceptr> d_vertices(meshes.size());
-	// std::vector<CUdeviceptr> d_indices(meshes.size());
-	std::vector<uint32_t> triangleInputFlags(meshes.size());
-
-    for (int meshID=0;meshID<meshes.size();meshID++) {
-    // upload the model to the device: the builder
-    TriangleMesh &model = meshes[meshID];
-    vertexBuffer[meshID].alloc_and_upload(model.vertex);
-    // indexBuffer[meshID].alloc_and_upload(model.index);
-
-    triangleInput[meshID] = {};
-    triangleInput[meshID].type
+    OptixBuildInput triangleInput = {};
+    triangleInput.type
       = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
     // create local variables, because we need a *pointer* to the
     // device pointers
-    d_vertices[meshID] = vertexBuffer[meshID].d_pointer();
-    // d_indices[meshID]  = indexBuffer[meshID].d_pointer();
+    CUdeviceptr d_vertices = vertexBuffer.d_pointer();
+    CUdeviceptr d_indices  = indexBuffer.d_pointer();
       
-    triangleInput[meshID].triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
-    triangleInput[meshID].triangleArray.vertexStrideInBytes = sizeof(float3);
-    triangleInput[meshID].triangleArray.numVertices         = (int)model.vertex.size();
-    triangleInput[meshID].triangleArray.vertexBuffers       = &d_vertices[meshID];
+    triangleInput.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
+    triangleInput.triangleArray.vertexStrideInBytes = sizeof(float3);
+    triangleInput.triangleArray.numVertices         = (int)model.vertex.size();
+    triangleInput.triangleArray.vertexBuffers       = &d_vertices;
     
-    // triangleInput[meshID].triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-    // triangleInput[meshID].triangleArray.indexStrideInBytes  = sizeof(vec3i);
-    // triangleInput[meshID].triangleArray.numIndexTriplets    = (int)model.index.size();
-    // triangleInput[meshID].triangleArray.indexBuffer         = d_indices[meshID];
+    triangleInput.triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+    triangleInput.triangleArray.indexStrideInBytes  = sizeof(int3);
+    triangleInput.triangleArray.numIndexTriplets    = (int)model.index.size();
+    triangleInput.triangleArray.indexBuffer         = d_indices;
     
-    triangleInputFlags[meshID] = 0 ;
+    uint32_t triangleInputFlags[1] = { 0 };
     
     // in this example we have one SBT entry, and no per-primitive
     // materials:
-    triangleInput[meshID].triangleArray.flags               = &triangleInputFlags[meshID];
-    triangleInput[meshID].triangleArray.numSbtRecords               = 1;
-    triangleInput[meshID].triangleArray.sbtIndexOffsetBuffer        = 0; 
-    triangleInput[meshID].triangleArray.sbtIndexOffsetSizeInBytes   = 0; 
-    triangleInput[meshID].triangleArray.sbtIndexOffsetStrideInBytes = 0; 
-    }
-
+    triangleInput.triangleArray.flags               = triangleInputFlags;
+    triangleInput.triangleArray.numSbtRecords               = 1;
+    triangleInput.triangleArray.sbtIndexOffsetBuffer        = 0; 
+    triangleInput.triangleArray.sbtIndexOffsetSizeInBytes   = 0; 
+    triangleInput.triangleArray.sbtIndexOffsetStrideInBytes = 0; 
+      
     // ==================================================================
     // BLAS setup
     // ==================================================================
     
     OptixAccelBuildOptions accelOptions = {};
-    accelOptions.buildFlags             = OPTIX_BUILD_FLAG_NONE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
+    accelOptions.buildFlags             = OPTIX_BUILD_FLAG_NONE
+      | OPTIX_BUILD_FLAG_ALLOW_COMPACTION
+      ;
     accelOptions.motionOptions.numKeys  = 1;
     accelOptions.operation              = OPTIX_BUILD_OPERATION_BUILD;
     
     OptixAccelBufferSizes blasBufferSizes;
     OPTIX_CHECK(optixAccelComputeMemoryUsage
-                ( state.context,
+                (state.context,
                  &accelOptions,
-                 triangleInput.data(),
-                 (int)meshes.size(),  // num_build_inputs
+                 &triangleInput,
+                 1,  // num_build_inputs
                  &blasBufferSizes
                  ));
 
@@ -541,8 +378,7 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     OptixAccelEmitDesc emitDesc;
     emitDesc.type   = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
     emitDesc.result = compactedSizeBuffer.d_pointer();
-
-
+    
     // ==================================================================
     // execute build (main stage)
     // ==================================================================
@@ -556,8 +392,8 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     OPTIX_CHECK(optixAccelBuild(state.context,
                                 /* stream */0,
                                 &accelOptions,
-                                triangleInput.data(),
-                                (int)meshes.size(),  
+                                &triangleInput,
+                                1,  
                                 tempBuffer.d_pointer(),
                                 tempBuffer.sizeInBytes,
                                 
@@ -570,10 +406,98 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
                                 ));
     CUDA_SYNC_CHECK();
 
-     // ==================================================================
-    // perform compaction ????
-    // ==================================================================
+
+
+
    
+
+}
+
+static void buildMesh( const WhittedState &state,
+   
+    OptixTraversableHandle &gas_handle,
+    CUdeviceptr &d_gas_output_buffer)
+    
+{
+    // Use default options for simplicity.  In a real use case we would want to
+    // enable compaction, etc
+    OptixAccelBuildOptions accel_options = {};
+    accel_options.buildFlags = OPTIX_BUILD_FLAG_NONE;
+    accel_options.operation  = OPTIX_BUILD_OPERATION_BUILD;
+
+    OptixBuildInput triangle_input = {};
+
+
+
+    const std::array<float3, 3> vertices =
+    { {
+            { -2.5f, -2.5f, 2.0f },
+            {  3.5f, -3.5f, 3.0f },
+            {  4.0f,  4.5f, 4.0f }
+    } };
+
+  
+
+    const size_t vertices_size = sizeof( float3 )*vertices.size();
+    CUdeviceptr d_vertices=0;
+    CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_vertices ), vertices_size ) );
+    CUDA_CHECK( cudaMemcpy(
+                reinterpret_cast<void*>( d_vertices ),
+                vertices.data(),
+                vertices_size,
+                cudaMemcpyHostToDevice
+                ) );
+
+    
+
+    // Our build input is a simple list of non-indexed triangle vertices
+    const uint32_t triangle_input_flags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
+    triangle_input.type                        = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+    triangle_input.triangleArray.vertexFormat  = OPTIX_VERTEX_FORMAT_FLOAT3;
+    triangle_input.triangleArray.numVertices   = static_cast<uint32_t>( vertices.size() );
+    triangle_input.triangleArray.vertexBuffers = &d_vertices;
+    triangle_input.triangleArray.flags         = triangle_input_flags;
+    triangle_input.triangleArray.numSbtRecords = 1;
+
+    OptixAccelBufferSizes gas_buffer_sizes;
+    OPTIX_CHECK( optixAccelComputeMemoryUsage(
+                state.context,
+                &accel_options,
+                &triangle_input, //build inputs
+                1, // Number of build inputs
+                &gas_buffer_sizes
+                ) );
+    CUdeviceptr d_temp_buffer_gas;
+    CUDA_CHECK( cudaMalloc(
+                reinterpret_cast<void**>( &d_temp_buffer_gas ),
+                gas_buffer_sizes.tempSizeInBytes
+                ) );
+    CUDA_CHECK( cudaMalloc(
+                reinterpret_cast<void**>( &d_gas_output_buffer ),
+                gas_buffer_sizes.outputSizeInBytes
+                ) );
+                
+
+    OPTIX_CHECK( optixAccelBuild(
+                state.context,
+                0,                  // CUDA stream
+                &accel_options,
+                &triangle_input,
+                1,                  // num build inputs
+                d_temp_buffer_gas,
+                gas_buffer_sizes.tempSizeInBytes,
+                d_gas_output_buffer,
+                gas_buffer_sizes.outputSizeInBytes,
+                &gas_handle,
+                nullptr,            // emitted property list
+                0                   // num emitted properties
+                ) );
+
+    // We can now free the scratch space buffer used during build and the vertex
+    // inputs, since they are not needed by our trivial shading method
+    CUDA_CHECK( cudaFree( reinterpret_cast<void*>( d_temp_buffer_gas ) ) );
+    CUDA_CHECK( cudaFree( reinterpret_cast<void*>( d_vertices        ) ) );
+
 
 }
 
@@ -646,30 +570,30 @@ static void createCameraProgram( WhittedState &state, std::vector<OptixProgramGr
 
 static void createMetalSphereProgram( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
 {
-    OptixProgramGroup           radiance_metal_sphere_prog_group;
-    OptixProgramGroupOptions    radiance_metal_sphere_prog_group_options = {};
-    OptixProgramGroupDesc       radiance_metal_sphere_prog_group_desc = {};
-    radiance_metal_sphere_prog_group_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
-        radiance_metal_sphere_prog_group_desc.hitgroup.moduleIS           = state.shading_module;
-    radiance_metal_sphere_prog_group_desc.hitgroup.entryFunctionNameIS    = "__intersection__sphere";
-    radiance_metal_sphere_prog_group_desc.hitgroup.moduleCH               = state.shading_module;
-    radiance_metal_sphere_prog_group_desc.hitgroup.entryFunctionNameCH    = "__closesthit__mesh";
-    radiance_metal_sphere_prog_group_desc.hitgroup.moduleAH               = nullptr;
-    radiance_metal_sphere_prog_group_desc.hitgroup.entryFunctionNameAH    = nullptr;
+    OptixProgramGroup           sphere_hit_prog_group;
+    OptixProgramGroupOptions    sphere_hit_prog_group_options = {};
+    OptixProgramGroupDesc       sphere_hit_prog_group_desc = {};
+    sphere_hit_prog_group_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
+        sphere_hit_prog_group_desc.hitgroup.moduleIS           = state.shading_module;
+    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameIS    = "__intersection__sphere";
+    sphere_hit_prog_group_desc.hitgroup.moduleCH               = state.shading_module;
+    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameCH    = "__closesthit__metal_radiance";
+    sphere_hit_prog_group_desc.hitgroup.moduleAH               = nullptr;
+    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameAH    = nullptr;
 
     char    log[2048];
     size_t  sizeof_log = sizeof( log );
     OPTIX_CHECK_LOG( optixProgramGroupCreate(
         state.context,
-        &radiance_metal_sphere_prog_group_desc,
+        &sphere_hit_prog_group_desc,
         1,
-        &radiance_metal_sphere_prog_group_options,
+        &sphere_hit_prog_group_options,
         log,
         &sizeof_log,
-        &radiance_metal_sphere_prog_group ) );
+        &sphere_hit_prog_group ) );
 
-    program_groups.push_back(radiance_metal_sphere_prog_group);
-    state.radiance_metal_sphere_prog_group = radiance_metal_sphere_prog_group;  
+    program_groups.push_back(sphere_hit_prog_group);
+    state.sphere_hit_prog_group = sphere_hit_prog_group;  
 }
 
 
@@ -699,34 +623,6 @@ static void createMeshProgram( WhittedState &state, std::vector<OptixProgramGrou
 
     program_groups.push_back(mesh_hit_prog_group);
     state.mesh_hit_prog_group = mesh_hit_prog_group;  
-}
-
-static void createMeshProgram2( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
-{
-    OptixProgramGroup           mesh_hit_prog_group2;
-    OptixProgramGroupOptions    mesh_hit_prog_group2_options = {};
-    OptixProgramGroupDesc       mesh_hit_prog_group2_desc = {};
-    mesh_hit_prog_group2_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
-    mesh_hit_prog_group2_desc.hitgroup.moduleCH               = state.shading_module;
-    mesh_hit_prog_group2_desc.hitgroup.entryFunctionNameCH    = "__closesthit__mesh2";
-    mesh_hit_prog_group2_desc.hitgroup.moduleIS               = nullptr;
-    mesh_hit_prog_group2_desc.hitgroup.entryFunctionNameIS    = nullptr;
-    mesh_hit_prog_group2_desc.hitgroup.moduleAH               = nullptr;
-    mesh_hit_prog_group2_desc.hitgroup.entryFunctionNameAH    = nullptr;
-
-     char    log[2048];
-    size_t  sizeof_log = sizeof( log );
-    OPTIX_CHECK_LOG( optixProgramGroupCreate(
-        state.context,
-        &mesh_hit_prog_group2_desc,
-        1,
-        &mesh_hit_prog_group2_options,
-        log,
-        &sizeof_log,
-        &mesh_hit_prog_group2 ) );
-
-    program_groups.push_back(mesh_hit_prog_group2);
-    state.mesh_hit_prog_group2 = mesh_hit_prog_group2;  
 }
 
 
@@ -783,12 +679,7 @@ void createPipeline( WhittedState &state )
     // Prepare program groups
     createModules( state );
     createCameraProgram( state, program_groups );
-    createMetalSphereProgram( state, program_groups );
     createMeshProgram( state, program_groups );
-    createMeshProgram2( state, program_groups );
-    
-
-
    // createMetalSphereProgram( state, program_groups );
     createMissProgram( state, program_groups );
 
@@ -887,37 +778,12 @@ void createSBT( WhittedState &state )
      
     {
 
-        // CUDABuffer hitgroupRecordsBuffer;
-
-        // std::vector<HitGroupSbtRecord> hitgroupRecords;
-
-        // HitGroupSbtRecord rec1;
-        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec1));
-        // hitgroupRecords.push_back(rec1);
-
-        // HitGroupSbtRecord rec2;
-        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group2, &rec2));
-        // hitgroupRecords.push_back(rec2);
-
-        // hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
-
-        // state.sbt.hitgroupRecordBase          = hitgroupRecordsBuffer.d_pointer();
-        // state.sbt.hitgroupRecordStrideInBytes = sizeof(HitGroupSbtRecord);
-        // state.sbt.hitgroupRecordCount         = (int)hitgroupRecords.size();
-
-
-
-
-
-
 
         CUdeviceptr hitgroup_record;
         size_t      hitgroup_record_size = sizeof( HitGroupSbtRecord );
         CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &hitgroup_record ), hitgroup_record_size ) );
         HitGroupSbtRecord hg_sbt;
-
-
-        OPTIX_CHECK( optixSbtRecordPackHeader( state.radiance_metal_sphere_prog_group, &hg_sbt ) );
+        OPTIX_CHECK( optixSbtRecordPackHeader( state.mesh_hit_prog_group, &hg_sbt ) );
         CUDA_CHECK( cudaMemcpy(
                     reinterpret_cast<void*>( hitgroup_record ),
                     &hg_sbt,
@@ -961,7 +827,7 @@ void createContext( WhittedState& state )
 
 void initCameraState()
 {
-    camera.setEye( make_float3( 0.0f, 0.0f, 5.0f ) );
+    camera.setEye( make_float3( 0.0f, 0.0f, 8.0f ) );
     camera.setLookat( make_float3( 0.0f, 0.0f, -4.0f ) );
     camera.setUp( make_float3( 0.0f, 1.0f, 0.0f ) );
     camera.setFovY( 60.0f );
@@ -1064,7 +930,7 @@ void cleanupState( WhittedState& state )
 {
     OPTIX_CHECK( optixPipelineDestroy     ( state.pipeline                ) );
     OPTIX_CHECK( optixProgramGroupDestroy ( state.raygen_prog_group       ) );
-    OPTIX_CHECK( optixProgramGroupDestroy ( state.radiance_metal_sphere_prog_group ) );
+    OPTIX_CHECK( optixProgramGroupDestroy ( state.sphere_hit_prog_group ) );
     OPTIX_CHECK( optixProgramGroupDestroy ( state.radiance_miss_prog_group         ) );
     OPTIX_CHECK( optixModuleDestroy       ( state.shading_module          ) );
     OPTIX_CHECK( optixModuleDestroy       ( state.camera_module           ) );
@@ -1134,10 +1000,7 @@ int main( int argc, char* argv[] )
 
        // buildMesh( state, state.gas_handle, state.d_gas_output_buffer);
 
-        //buildTriangle(state, state.gas_handle);
-        
-        createGeometry  ( state );
-
+        buildTriangle(state, state.gas_handle);
   
         createPipeline ( state );
         createSBT      ( state );
