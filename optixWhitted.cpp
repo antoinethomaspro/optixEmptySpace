@@ -115,11 +115,11 @@ struct WhittedState
     OptixProgramGroup           raygen_prog_group         = 0;
     OptixProgramGroup           radiance_miss_prog_group  = 0;
     OptixProgramGroup           occlusion_miss_prog_group = 0;
-    OptixProgramGroup           sphere_hit_prog_group  = 0;
+    OptixProgramGroup           radiance_metal_sphere_prog_group  = 0;
     OptixProgramGroup           mesh_hit_prog_group = 0;
     OptixProgramGroup           mesh_hit_prog_group2 = 0;
 
-    OptixProgramGroup           radiance_metal_sphere_prog_group  = 0;
+   
 
     OptixPipeline               pipeline                  = 0;
     OptixPipelineCompileOptions pipeline_compile_options  = {};
@@ -356,7 +356,7 @@ void createGeometry( WhittedState &state )
     // Build Custom Primitives
     //
     const Sphere g_sphere = {
-    { 8.0f, 1.5f, -2.5f }, // center
+    { -5.0f, 1.5f, 2.5f }, // center
     1.0f                   // radius
         };
 
@@ -646,30 +646,30 @@ static void createCameraProgram( WhittedState &state, std::vector<OptixProgramGr
 
 static void createMetalSphereProgram( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
 {
-    OptixProgramGroup           sphere_hit_prog_group;
-    OptixProgramGroupOptions    sphere_hit_prog_group_options = {};
-    OptixProgramGroupDesc       sphere_hit_prog_group_desc = {};
-    sphere_hit_prog_group_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
-        sphere_hit_prog_group_desc.hitgroup.moduleIS           = state.shading_module;
-    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameIS    = "__intersection__sphere";
-    sphere_hit_prog_group_desc.hitgroup.moduleCH               = state.shading_module;
-    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameCH    = "__closesthit__mesh";
-    sphere_hit_prog_group_desc.hitgroup.moduleAH               = nullptr;
-    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameAH    = nullptr;
+    OptixProgramGroup           radiance_metal_sphere_prog_group;
+    OptixProgramGroupOptions    radiance_metal_sphere_prog_group_options = {};
+    OptixProgramGroupDesc       radiance_metal_sphere_prog_group_desc = {};
+    radiance_metal_sphere_prog_group_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
+        radiance_metal_sphere_prog_group_desc.hitgroup.moduleIS           = state.shading_module;
+    radiance_metal_sphere_prog_group_desc.hitgroup.entryFunctionNameIS    = "__intersection__sphere";
+    radiance_metal_sphere_prog_group_desc.hitgroup.moduleCH               = state.shading_module;
+    radiance_metal_sphere_prog_group_desc.hitgroup.entryFunctionNameCH    = "__closesthit__mesh";
+    radiance_metal_sphere_prog_group_desc.hitgroup.moduleAH               = nullptr;
+    radiance_metal_sphere_prog_group_desc.hitgroup.entryFunctionNameAH    = nullptr;
 
     char    log[2048];
     size_t  sizeof_log = sizeof( log );
     OPTIX_CHECK_LOG( optixProgramGroupCreate(
         state.context,
-        &sphere_hit_prog_group_desc,
+        &radiance_metal_sphere_prog_group_desc,
         1,
-        &sphere_hit_prog_group_options,
+        &radiance_metal_sphere_prog_group_options,
         log,
         &sizeof_log,
-        &sphere_hit_prog_group ) );
+        &radiance_metal_sphere_prog_group ) );
 
-    program_groups.push_back(sphere_hit_prog_group);
-    state.sphere_hit_prog_group = sphere_hit_prog_group;  
+    program_groups.push_back(radiance_metal_sphere_prog_group);
+    state.radiance_metal_sphere_prog_group = radiance_metal_sphere_prog_group;  
 }
 
 
@@ -887,47 +887,47 @@ void createSBT( WhittedState &state )
      
     {
 
-        CUDABuffer hitgroupRecordsBuffer;
+        // CUDABuffer hitgroupRecordsBuffer;
 
-        std::vector<HitGroupSbtRecord> hitgroupRecords;
+        // std::vector<HitGroupSbtRecord> hitgroupRecords;
 
-        HitGroupSbtRecord rec1;
-        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec1));
-        hitgroupRecords.push_back(rec1);
+        // HitGroupSbtRecord rec1;
+        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec1));
+        // hitgroupRecords.push_back(rec1);
 
-        HitGroupSbtRecord rec2;
-        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group2, &rec2));
-        hitgroupRecords.push_back(rec2);
+        // HitGroupSbtRecord rec2;
+        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group2, &rec2));
+        // hitgroupRecords.push_back(rec2);
 
-        hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
+        // hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
 
-        state.sbt.hitgroupRecordBase          = hitgroupRecordsBuffer.d_pointer();
-        state.sbt.hitgroupRecordStrideInBytes = sizeof(HitGroupSbtRecord);
-        state.sbt.hitgroupRecordCount         = (int)hitgroupRecords.size();
-
-
+        // state.sbt.hitgroupRecordBase          = hitgroupRecordsBuffer.d_pointer();
+        // state.sbt.hitgroupRecordStrideInBytes = sizeof(HitGroupSbtRecord);
+        // state.sbt.hitgroupRecordCount         = (int)hitgroupRecords.size();
 
 
 
 
 
-        // CUdeviceptr hitgroup_record;
-        // size_t      hitgroup_record_size = sizeof( HitGroupSbtRecord );
-        // CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &hitgroup_record ), hitgroup_record_size ) );
-        // HitGroupSbtRecord hg_sbt;
 
 
-        // OPTIX_CHECK( optixSbtRecordPackHeader( state.mesh_hit_prog_group, &hg_sbt ) );
-        // CUDA_CHECK( cudaMemcpy(
-        //             reinterpret_cast<void*>( hitgroup_record ),
-        //             &hg_sbt,
-        //             hitgroup_record_size,
-        //             cudaMemcpyHostToDevice
-        //             ) );
+        CUdeviceptr hitgroup_record;
+        size_t      hitgroup_record_size = sizeof( HitGroupSbtRecord );
+        CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &hitgroup_record ), hitgroup_record_size ) );
+        HitGroupSbtRecord hg_sbt;
 
-        // state.sbt.hitgroupRecordBase            = hitgroup_record;  //ok
-        // state.sbt.hitgroupRecordStrideInBytes   = sizeof( HitGroupSbtRecord );
-        // state.sbt.hitgroupRecordCount           = 1;
+
+        OPTIX_CHECK( optixSbtRecordPackHeader( state.radiance_metal_sphere_prog_group, &hg_sbt ) );
+        CUDA_CHECK( cudaMemcpy(
+                    reinterpret_cast<void*>( hitgroup_record ),
+                    &hg_sbt,
+                    hitgroup_record_size,
+                    cudaMemcpyHostToDevice
+                    ) );
+
+        state.sbt.hitgroupRecordBase            = hitgroup_record;  //ok
+        state.sbt.hitgroupRecordStrideInBytes   = sizeof( HitGroupSbtRecord );
+        state.sbt.hitgroupRecordCount           = 1;
 
     }
     
@@ -1064,7 +1064,7 @@ void cleanupState( WhittedState& state )
 {
     OPTIX_CHECK( optixPipelineDestroy     ( state.pipeline                ) );
     OPTIX_CHECK( optixProgramGroupDestroy ( state.raygen_prog_group       ) );
-    OPTIX_CHECK( optixProgramGroupDestroy ( state.sphere_hit_prog_group ) );
+    OPTIX_CHECK( optixProgramGroupDestroy ( state.radiance_metal_sphere_prog_group ) );
     OPTIX_CHECK( optixProgramGroupDestroy ( state.radiance_miss_prog_group         ) );
     OPTIX_CHECK( optixModuleDestroy       ( state.shading_module          ) );
     OPTIX_CHECK( optixModuleDestroy       ( state.camera_module           ) );
@@ -1134,9 +1134,9 @@ int main( int argc, char* argv[] )
 
        // buildMesh( state, state.gas_handle, state.d_gas_output_buffer);
 
-        buildTriangle(state, state.gas_handle);
+        //buildTriangle(state, state.gas_handle);
         
-        //createGeometry  ( state );
+        createGeometry  ( state );
 
   
         createPipeline ( state );
