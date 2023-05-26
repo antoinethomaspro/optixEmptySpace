@@ -139,7 +139,7 @@ struct WhittedState
 
 // Metal sphere, glass sphere, floor, light
 const Sphere g_sphere = {
-    { 2.0f, 1.5f, -2.5f }, // center
+    { 0.0f, 0.0f, -2.0f }, // center
     1.0f                   // radius
 };
 
@@ -356,7 +356,7 @@ void createGeometry( WhittedState &state )
     // Build Custom Primitives
     //
     const Sphere g_sphere = {
-    { -13.0f, 9.5f, -5.5f }, // center
+    { -0.0f, 0.0f, -5.5f }, // center
     3.0f                   // radius
         };
 
@@ -961,8 +961,8 @@ void createContext( WhittedState& state )
 
 void initCameraState()
 {
-    camera.setEye( make_float3( 8.0f, 2.0f, -4.0f ) );
-    camera.setLookat( make_float3( 4.0f, 2.3f, -4.0f ) );
+    camera.setEye( make_float3( 0.0f, 0.0f, 5.0f ) );
+    camera.setLookat( make_float3( 0.0f, 0.0f, -4.0f ) );
     camera.setUp( make_float3( 0.0f, 1.0f, 0.0f ) );
     camera.setFovY( 60.0f );
     camera_changed = true;

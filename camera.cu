@@ -89,5 +89,6 @@ extern "C" __global__ void __raygen__pinhole_camera()
 
 
     params.frame_buffer[image_index] = make_color( acc_val );
-    params.accum_buffer[image_index] = acc_val;
 }
+
+
