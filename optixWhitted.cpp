@@ -723,6 +723,9 @@ void createPipeline( WhittedState &state )
     createModules( state );
     createCameraProgram( state, program_groups );
     createMeshProgram( state, program_groups );
+    createMeshProgram2( state, program_groups );
+
+
    // createMetalSphereProgram( state, program_groups );
     createMissProgram( state, program_groups );
 
@@ -830,7 +833,7 @@ void createSBT( WhittedState &state )
         hitgroupRecords.push_back(rec1);
 
         HitGroupSbtRecord rec2;
-        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec2));
+        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group2, &rec2));
         hitgroupRecords.push_back(rec2);
 
         hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
