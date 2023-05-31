@@ -99,7 +99,7 @@ struct Record
 
 typedef Record<CameraData>      RayGenRecord;
 typedef Record<MissData>        MissRecord;
-typedef Record<HitGroupData>    HitGroupSbtRecord;
+typedef Record<TetrahedronIndex>    HitGroupRecord;
 
 
 struct WhittedState
@@ -777,12 +777,43 @@ void createSBT( WhittedState &state )
 
      
     {
+        Face face1;
+        face1.elemIDs.x = 1;
+        face1.elemIDs.y = 0;
+        Face face2;
+        face2.elemIDs.x = 2;
+        face2.elemIDs.y = 0;
+        Face face3;
+        face3.elemIDs.x = 3;
+        face3.elemIDs.y = 0;
+        Face face4;
+        face4.elemIDs.x = 4;
+        face4.elemIDs.y = 0;
+
+        std::vector<Face> faces;
+
+        //
+
+         std::vector<int> indices = {0, 1, 2, 3,
+                                    0, 1, 6, 2, 
+                                    0, 3, 2, 5, 
+                                    0, 1, 3, 4, 
+                                    3, 1, 2, 7};
 
 
+
+        
+        CUDABuffer indexBuffer;
+        indexBuffer.alloc_and_upload(indices);
+
+        
         CUdeviceptr hitgroup_record;
-        size_t      hitgroup_record_size = sizeof( HitGroupSbtRecord );
+        size_t      hitgroup_record_size = sizeof( HitGroupRecord );
         CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &hitgroup_record ), hitgroup_record_size ) );
-        HitGroupSbtRecord hg_sbt;
+
+        HitGroupRecord hg_sbt;
+        hg_sbt.data.indices = (int*)indexBuffer.d_pointer();   //retourne un pointeur sur le cudabuffer
+
         OPTIX_CHECK( optixSbtRecordPackHeader( state.mesh_hit_prog_group, &hg_sbt ) );
         CUDA_CHECK( cudaMemcpy(
                     reinterpret_cast<void*>( hitgroup_record ),
@@ -792,7 +823,7 @@ void createSBT( WhittedState &state )
                     ) );
 
         state.sbt.hitgroupRecordBase            = hitgroup_record;  //ok
-        state.sbt.hitgroupRecordStrideInBytes   = sizeof( HitGroupSbtRecord );
+        state.sbt.hitgroupRecordStrideInBytes   = sizeof( HitGroupRecord );
         state.sbt.hitgroupRecordCount           = 1;
 
     }

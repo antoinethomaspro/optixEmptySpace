@@ -38,9 +38,20 @@ enum RayType
     RAY_TYPE_COUNT = 1
 };
 
+struct Face { int2 elemIDs; };
+
+
 struct HitGroupData
 {
-    // No data needed
+    Face *faces;
+    int2 *elemIDs;
+};
+
+
+struct TetrahedronIndex
+{
+    float3 *vertices;
+    int    *indices;
 };
 
 struct Sphere
