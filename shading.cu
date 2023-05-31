@@ -46,25 +46,7 @@ extern "C" __global__ void __intersection__sphere()
     optixReportIntersection(0., 0.);
 }
 
-static __device__ __inline__ RadiancePRD getRadiancePRD()
-{
-    RadiancePRD prd;
-    prd.result.x = int_as_float( optixGetPayload_0() );
-    prd.result.y = int_as_float( optixGetPayload_1() );
-    prd.result.z = int_as_float( optixGetPayload_2() );
-    prd.importance = int_as_float( optixGetPayload_3() );
-    prd.depth = optixGetPayload_4();
-    return prd;
-}
 
-static __device__ __inline__ void setRadiancePRD( const RadiancePRD &prd )
-{
-    optixSetPayload_0( float_as_int(prd.result.x) );
-    optixSetPayload_1( float_as_int(prd.result.y) );
-    optixSetPayload_2( float_as_int(prd.result.z) );
-    optixSetPayload_3( float_as_int(prd.importance) );
-    optixSetPayload_4( prd.depth );
-}
 
 static __forceinline__ __device__ void setPayload( float3 p )
 {
@@ -75,17 +57,9 @@ static __forceinline__ __device__ void setPayload( float3 p )
 
 
 
-// extern "C" __global__ void __closesthit__metal_radiance()
-// {
-//     setPayload( make_float3(1.f, 0.f, 0.f));
-// }
-
 extern "C" __global__ void __miss__constant_bg()
 {
-    const MissData* sbt_data = (MissData*) optixGetSbtDataPointer();
-    RadiancePRD prd = getRadiancePRD();
-    prd.result = sbt_data->bg_color;
-    setRadiancePRD(prd);
+   
 }
 
 extern "C" __global__ void __closesthit__mesh()
