@@ -60,20 +60,26 @@ extern "C" __global__ void __raygen__pinhole_camera()
 
     //OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
     //OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+    //OPTIX_RAY_FLAG_NONE,
+    for (float i = 0.f; i < 20.f; i+=0.05f ) {
+
+    float3 origin = ray_origin + ray_direction*i;
 
     optixTrace(
         params.handle,
-        ray_origin,
+        origin,
         ray_direction,
         0.,
         1e16f,
         0.0f,
         OptixVisibilityMask( 1 ),
-        OPTIX_RAY_FLAG_NONE,
-        RAY_TYPE_RADIANCE,
-        RAY_TYPE_COUNT,
-        RAY_TYPE_RADIANCE,
+        OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
+        0, // SBT offset
+        0, // SBT stride
+        0, // missSBTIndex
         float3_as_args(payload_rgb));
+
+    }
    
 
     params.frame_buffer[image_index] = make_color( payload_rgb );

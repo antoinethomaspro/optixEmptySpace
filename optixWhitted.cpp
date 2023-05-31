@@ -99,7 +99,7 @@ struct Record
 
 typedef Record<CameraData>      RayGenRecord;
 typedef Record<MissData>        MissRecord;
-typedef Record<HitGroupData>   HitGroupSbtRecord;
+typedef Record<HitGroupData>    HitGroupSbtRecord;
 
 
 struct WhittedState
