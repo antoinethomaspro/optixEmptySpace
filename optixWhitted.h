@@ -52,6 +52,8 @@ struct TetrahedronIndex
 {
     float3 *vertices;
     int    *indices;
+    Face *faces;
+
 };
 
 struct Sphere

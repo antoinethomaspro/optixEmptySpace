@@ -76,6 +76,8 @@ extern "C" __global__ void __closesthit__mesh()
     const TetrahedronIndex* hit_group_data = reinterpret_cast<TetrahedronIndex*>( optixGetSbtDataPointer() );
     
     const int index1 = hit_group_data->indices[primID * 4];
+    const Face face1 = hit_group_data->faces[primID];
+    const int lol = face1.elemIDs.x;
 
     // const HitGroupData &sbtData
     //   = *(const HitGroupData*)optixGetSbtDataPointer();

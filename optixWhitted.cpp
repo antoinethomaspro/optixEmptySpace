@@ -806,6 +806,9 @@ void createSBT( WhittedState &state )
         CUDABuffer indexBuffer;
         indexBuffer.alloc_and_upload(indices);
 
+        CUDABuffer faceBuffer;
+        faceBuffer.alloc_and_upload(faces);
+
         
         CUdeviceptr hitgroup_record;
         size_t      hitgroup_record_size = sizeof( HitGroupRecord );
@@ -813,6 +816,7 @@ void createSBT( WhittedState &state )
 
         HitGroupRecord hg_sbt;
         hg_sbt.data.indices = (int*)indexBuffer.d_pointer();   //retourne un pointeur sur le cudabuffer
+        hg_sbt.data.faces = (Face*)faceBuffer.d_pointer();
 
         OPTIX_CHECK( optixSbtRecordPackHeader( state.mesh_hit_prog_group, &hg_sbt ) );
         CUDA_CHECK( cudaMemcpy(
