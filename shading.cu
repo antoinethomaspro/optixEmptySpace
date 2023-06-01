@@ -91,18 +91,19 @@ extern "C" __global__ void __miss__constant_bg()
 extern "C" __global__ void __closesthit__mesh()
 {
 const int   primID = optixGetPrimitiveIndex();
-    switch(primID){
-        case 0:
-            setPayload(  make_float3( 1.0f, 0.f, 0.f));
-            break;
-        case 1:
-            setPayload(  make_float3( 0.f, 1.0f, 0.f));
-            break;
-        case 2:
-            setPayload(  make_float3( 0.f, 0.f, 1.0f));
-            break;
-        case 3:
-            setPayload( make_float3( 0., 1., 1.));
-            break;
-    }
+    // switch(primID){
+    //     case 0:
+    //         setPayload(  make_float3( 1.0f, 0.f, 0.f));
+    //         break;
+    //     case 1:
+    //         setPayload(  make_float3( 0.f, 1.0f, 0.f));
+    //         break;
+    //     case 2:
+    //         setPayload(  make_float3( 0.f, 0.f, 1.0f));
+    //         break;
+    //     case 3:
+    //         setPayload( make_float3( 0., 1., 1.));
+    //         break;
+    // }
+    setPayload(  make_float3( 0.f, 1.0f, 0.f));
 }

@@ -281,31 +281,67 @@ static void sphere_bound(float3 center, float radius, float result[6])
 
 static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle)
 {
-    std::vector<float3> arr = {{
+    std::vector<float3> arr = {{    //on traitera ça à la fin
     { 0.f, 0.f, 0.0f },
     { 5.f, 0.f, 0.0f},
     { 0.0f, 5.f, 0.f},
-    { 0.0f, 0.f, -5.f},
+    { 0.0f, 0.f, 5.f},
+    {0.f, -5.f,  0.f},
+    {-5.f, 0.f, 0.f} ,
+    {0.f, 0.f, -5.f},
+    {5.f, 5.f, 5.f }
         }};
-
-    std::vector<int3> indices = { {0, 1, 2}, {0, 2, 3}, {1, 3, 2}, {0,3,1}};
-
 
     class TriangleMesh {
     public:
     std::vector<float3> vertex;
     std::vector<int3> index;
-        };
+
+    void convertTetrahedronToTriangles(const std::vector<int>& tetraIndices) {
+        for (size_t i = 0; i < tetraIndices.size(); i += 4) {
+            int a = tetraIndices[i];
+            int b = tetraIndices[i + 1];
+            int c = tetraIndices[i + 2];
+            int d = tetraIndices[i + 3];
+
+            // Triangle 1
+            int3 tri1 = { a, b, c };
+            index.push_back(tri1);
+
+            // Triangle 2
+            int3 tri2 = { a, c, d };
+            index.push_back(tri2);
+
+            // Triangle 3
+            int3 tri3 = { a, d, b };
+            index.push_back(tri3);
+
+            // Triangle 4
+            int3 tri4 = { b, d, c };
+            index.push_back(tri4);
+        }
+    }
+};
 
     TriangleMesh model;
     for (const auto& vertex : arr) {
     model.vertex.push_back(vertex);
     }
 
-    for (const auto& index : indices) {
-    model.index.push_back(index);
-    }
+    std::vector<int> tetraIndices = {
+        0, 1, 2, 3,
+        0, 1, 6, 2,
+        0, 3, 2, 5,
+        0, 1, 3, 4,
+        3, 1, 2, 7
+    };
 
+    // std::vector<int3> indices = { {0, 1, 2}, {0, 2, 3}, {1, 3, 2}, {0,3,1}};
+    //  for (const auto& index : indices) {
+    // model.index.push_back(index);
+    // }
+
+    model.convertTetrahedronToTriangles(tetraIndices);
 
     CUDABuffer vertexBuffer;
     CUDABuffer indexBuffer;
@@ -313,6 +349,8 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
 
     vertexBuffer.alloc_and_upload(model.vertex);
     indexBuffer.alloc_and_upload(model.index);
+
+    
 
     
 
