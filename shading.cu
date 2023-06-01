@@ -70,14 +70,30 @@ extern "C" __global__ void __miss__constant_bg()
 }
 
 extern "C" __global__ void __closesthit__mesh()
-{
+{   
+    float3  payload = getPayload();
+
     const int primID = optixGetPrimitiveIndex();
 
     const TetrahedronIndex* hit_group_data = reinterpret_cast<TetrahedronIndex*>( optixGetSbtDataPointer() );
     
-    const int index1 = hit_group_data->indices[primID * 4];
     const Face face1 = hit_group_data->faces[primID];
-    const int lol = face1.elemIDs.x;
+    int elemID = optixIsTriangleBackFaceHit()? face1.elemIDs.x : face1.elemIDs.y;
+
+    // float floatNum = static_cast<float>(elemID);
+
+
+
+    if (elemID < 0) {
+        return;
+    } else {
+        setPayload(  payload + make_float3( 0.1f, 0.f, 0.f));
+    }
+
+    // setPayload(  payload + make_float3( 1.f, 0.f, 0.f));
+
+
+
 
     // const HitGroupData &sbtData
     //   = *(const HitGroupData*)optixGetSbtDataPointer();

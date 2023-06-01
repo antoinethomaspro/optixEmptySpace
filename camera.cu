@@ -73,7 +73,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
         1e16f,
         0.0f,
         OptixVisibilityMask( 1 ),
-        OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
+        OPTIX_RAY_FLAG_NONE,
         0, // SBT offset
         0, // SBT stride
         0, // missSBTIndex

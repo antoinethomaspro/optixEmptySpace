@@ -779,18 +779,24 @@ void createSBT( WhittedState &state )
     {
         Face face1;
         face1.elemIDs.x = 1;
-        face1.elemIDs.y = 0;
+        face1.elemIDs.y = -1;
         Face face2;
         face2.elemIDs.x = 2;
-        face2.elemIDs.y = 0;
+        face2.elemIDs.y = -1;
         Face face3;
         face3.elemIDs.x = 3;
-        face3.elemIDs.y = 0;
+        face3.elemIDs.y = -1;
         Face face4;
         face4.elemIDs.x = 4;
-        face4.elemIDs.y = 0;
+        face4.elemIDs.y = -1;
 
         std::vector<Face> faces;
+        faces.push_back(face1);
+        faces.push_back(face2);
+        faces.push_back(face3);
+        faces.push_back(face4);
+
+
 
         //
 
