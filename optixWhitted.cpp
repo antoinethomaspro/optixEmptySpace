@@ -346,68 +346,58 @@ static void sphere_bound(float3 center, float radius, float result[6])
 
 static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle, std::vector<Face> &faceBuffer )
 {
-   
-    class TriangleMesh {
-    public:
-    std::vector<float3> vertex;
-    std::vector<int3> index;
-};
-    std::vector<float3> arr = {{    //on traitera ça à la fin
-    { 0.f, 0.f, 0.f },
-    { 5.f, 0.f, 0.f },
-    { 0.f, 5.f, 0.f },
-    { 0.f, 0.f, 5.f },
-    {0.f, -5.f,  0.f},
-    {-5.f, 0.f, 0.f} 
-    // {0.f, 0.f, -5.f},
-    // {5.f, 5.f, 5.f }
-        }};
-
     Element element0;
     element0.fillTriangles({ 0, 1, 2, 3 });
     element0.elemID = 0;
-     Element element1;
+
+    Element element1;
     element1.fillTriangles({ 0, 1, 6, 2 });
     element1.elemID = 1;
 
+    Element element2;
+    element2.fillTriangles({ 0, 3, 2, 5 });
+    element2.elemID = 2;
 
-    // Call the fillFaceBuffer function
-    fillFaceBuffer({element0, element1}, faceBuffer);
+    Element element3;
+    element3.fillTriangles({ 0, 1, 3, 4 });
+    element3.elemID = 3;
+
+    Element element4;
+    element4.fillTriangles({ 3, 1, 2, 7 });
+    element4.elemID = 4;
 
 
-    std::vector<int3> index;
+    // Call the fillFaceBuffer function  !!!! HERRE ADD ELEMENTS !!!
+    fillFaceBuffer({element0, element1}, faceBuffer); 
+
+    std::vector<int3> ind;
     for (const auto& face : faceBuffer) {
-    index.push_back(face.index);
-    }   
-
-    // std::cout << "Triangles of element0:" << std::endl;
-    // for (const auto& triangle : element0.triangles) {
-    // std::cout << triangle.index.x << ", " << triangle.index.y << ", " << triangle.index.z << std::endl;
-    // }
-
-    // std::cout << "Triangles of element1:" << std::endl;
-    // for (const auto& triangle : element1.triangles) {
-    // std::cout << triangle.index.x << ", " << triangle.index.y << ", " << triangle.index.z << std::endl;
-    // }
-
-    std::cout << "Faces in faceBuffer:" << std::endl;
-    for (const auto& face : faceBuffer) {
-    std::cout << "Face Index: (" << face.index.x << ", " << face.index.y << ", " << face.index.z << ")" << std::endl;
-    std::cout << "ElemIDs: " << face.elemIDs.x << ", " << face.elemIDs.y << std::endl;
-    std::cout << "--------------" << std::endl;
-}
+        ind.push_back(face.index);
+    }
 
 
+   
+     std::vector<float3> arr = {{    //on traitera ça à la fin
+    { 0.f, 0.f, 0.0f },
+    { 5.f, 0.f, 0.0f},
+    { 0.0f, 5.f, 0.f},
+    { 0.0f, 0.f, 5.f},
+    {0.f, -5.f,  0.f},
+    {-5.f, 0.f, 0.f} ,
+    {0.f, 0.f, -5.f},
+    {5.f, 5.f, 5.f }
+        }};
 
 
     CUDABuffer vertexBuffer;
     CUDABuffer indexBuffer;
 
 
-    vertexBuffer.alloc_and_upload(arr);
-    indexBuffer.alloc_and_upload(index);
 
-    
+
+    vertexBuffer.alloc_and_upload(arr);
+    indexBuffer.alloc_and_upload(ind);
+
 
     
 
@@ -430,7 +420,7 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     
     triangleInput.triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
     triangleInput.triangleArray.indexStrideInBytes  = sizeof(int3);
-    triangleInput.triangleArray.numIndexTriplets    = (int)element0.triangles.size();
+    triangleInput.triangleArray.numIndexTriplets    = (int)ind.size();
     triangleInput.triangleArray.indexBuffer         = d_indices;
     
     uint32_t triangleInputFlags[1] = { 0 };
@@ -500,11 +490,6 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
                                 &emitDesc,1
                                 ));
     CUDA_SYNC_CHECK();
-
-
-
-
-   
 
 }
 
