@@ -853,24 +853,34 @@ void createSBT( WhittedState &state )
 
      
     {
-        Face face1;
-        face1.elemIDs.x = 0;
-        face1.elemIDs.y = -1;
-        Face face2;
-        face2.elemIDs.x = 1;
-        face2.elemIDs.y = -1;
-        Face face3;
-        face3.elemIDs.x = 2;
-        face3.elemIDs.y = -1;
-        Face face4;
-        face4.elemIDs.x = 3;
-        face4.elemIDs.y = -1;
+        Element element0;
+        element0.fillTriangles({ 0, 1, 2, 3 });
+        element0.elemID = 0;
 
+        // Create an empty vector to store the faces
         std::vector<Face> faces;
-        faces.push_back(face1);
-        faces.push_back(face2);
-        faces.push_back(face3);
-        faces.push_back(face4); 
+
+        // Call the fillFaceBuffer function
+        fillFaceBuffer({element0}, faces);
+
+        // Face face1;
+        // face1.elemIDs.x = 0;
+        // face1.elemIDs.y = -1;
+        // Face face2;
+        // face2.elemIDs.x = 1;
+        // face2.elemIDs.y = -1;
+        // Face face3;
+        // face3.elemIDs.x = 2;
+        // face3.elemIDs.y = -1;
+        // Face face4;
+        // face4.elemIDs.x = 3;
+        // face4.elemIDs.y = -1;
+
+        // std::vector<Face> faces;
+        // faces.push_back(face1);
+        // faces.push_back(face2);
+        // faces.push_back(face3);
+        // faces.push_back(face4); 
         
         
         CUDABuffer faceBuffer;
