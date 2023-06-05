@@ -346,21 +346,6 @@ static void sphere_bound(float3 center, float radius, float result[6])
 
 static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle, std::vector<Face> &faceBuffer )
 {
-   
-    class TriangleMesh {
-    public:
-    std::vector<float3> vertex;
-    std::vector<int3> index;
-};
-    std::vector<float3> arr = {{    //on traitera ça à la fin
-    { 0.f, 0.f, 0.f },
-    { 5.f, 0.f, 0.f },
-    { 0.f, 5.f, 0.f },
-    { 0.f, 0.f, 5.f },
-    {0.f, -5.f,  0.f},
-    {-10.f, 0.f, 0.f} 
-        }};
-
     Element element0;
     element0.fillTriangles({ 0, 1, 2, 3 });
     element0.elemID = 0;
@@ -373,38 +358,71 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     // Call the fillFaceBuffer function
     fillFaceBuffer({element0, element1}, faceBuffer);
 
+   
+     std::vector<float3> arr = {{    //on traitera ça à la fin
+    { 0.f, 0.f, 0.0f },
+    { 5.f, 0.f, 0.0f},
+    { 0.0f, 5.f, 0.f},
+    { 0.0f, 0.f, 5.f},
+    {0.f, -5.f,  0.f},
+    {-5.f, 0.f, 0.f} ,
+    {0.f, 0.f, -5.f},
+    {5.f, 5.f, 5.f }
+        }};
+
+    class TriangleMesh {
+    public:
+    std::vector<float3> vertex;
     std::vector<int3> index;
-    for (const auto& face : faceBuffer) {
-    index.push_back(face.index);
-    }   
 
-    std::cout << "Triangles of element0:" << std::endl;
-    for (const auto& triangle : element0.triangles) {
-    std::cout << triangle.index.x << ", " << triangle.index.y << ", " << triangle.index.z << std::endl;
+    void convertTetrahedronToTriangles(const std::vector<int>& tetraIndices) {
+        for (size_t i = 0; i < tetraIndices.size(); i += 4) {
+            int a = tetraIndices[i];
+            int b = tetraIndices[i + 1];
+            int c = tetraIndices[i + 2];
+            int d = tetraIndices[i + 3];
+
+            // Triangle 1
+            int3 tri1 = { a, b, c };
+            index.push_back(tri1);
+
+            // Triangle 2
+            int3 tri2 = { a, c, d };
+            index.push_back(tri2);
+
+            // Triangle 3
+            int3 tri3 = { a, d, b };
+            index.push_back(tri3);
+
+            // Triangle 4
+            int3 tri4 = { b, d, c };
+            index.push_back(tri4);
+        }
+    }
+};
+
+    TriangleMesh model;
+    for (const auto& vertex : arr) {
+    model.vertex.push_back(vertex);
     }
 
-    std::cout << "Triangles of element1:" << std::endl;
-    for (const auto& triangle : element1.triangles) {
-    std::cout << triangle.index.x << ", " << triangle.index.y << ", " << triangle.index.z << std::endl;
-    }
-
-    std::cout << "Faces in faceBuffer:" << std::endl;
-    for (const auto& face : faceBuffer) {
-    std::cout << "Face Index: (" << face.index.x << ", " << face.index.y << ", " << face.index.z << ")" << std::endl;
-    std::cout << "ElemIDs: " << face.elemIDs.x << ", " << face.elemIDs.y << std::endl;
-    std::cout << "--------------" << std::endl;
-    }
+    std::vector<int> tetraIndices = {
+        0, 1, 2, 3,
+        0, 1, 6, 2
+    };
 
 
+    model.convertTetrahedronToTriangles(tetraIndices);
 
     CUDABuffer vertexBuffer;
     CUDABuffer indexBuffer;
 
+    std::vector<float3> vert;
 
-    vertexBuffer.alloc_and_upload(arr);
-    indexBuffer.alloc_and_upload(index);
 
-    
+    vertexBuffer.alloc_and_upload(model.vertex);
+    indexBuffer.alloc_and_upload(model.index);
+
 
     
 
@@ -422,13 +440,12 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
       
     triangleInput.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
     triangleInput.triangleArray.vertexStrideInBytes = sizeof(float3);
-    triangleInput.triangleArray.numVertices         = (int)arr.size();
+    triangleInput.triangleArray.numVertices         = (int)model.vertex.size();
     triangleInput.triangleArray.vertexBuffers       = &d_vertices;
     
     triangleInput.triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
     triangleInput.triangleArray.indexStrideInBytes  = sizeof(int3);
-    //(int)element0.triangles.size()
-    triangleInput.triangleArray.numIndexTriplets    = 7;
+    triangleInput.triangleArray.numIndexTriplets    = (int)model.index.size();
     triangleInput.triangleArray.indexBuffer         = d_indices;
     
     uint32_t triangleInputFlags[1] = { 0 };
@@ -498,11 +515,6 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
                                 &emitDesc,1
                                 ));
     CUDA_SYNC_CHECK();
-
-
-
-
-   
 
 }
 
