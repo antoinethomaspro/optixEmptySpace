@@ -358,6 +358,12 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     // Call the fillFaceBuffer function
     fillFaceBuffer({element0, element1}, faceBuffer);
 
+    std::vector<int3> ind;
+    for (const auto& face : faceBuffer) {
+        ind.push_back(face.index);
+    }
+
+
    
      std::vector<float3> arr = {{    //on traitera ça à la fin
     { 0.f, 0.f, 0.0f },
@@ -420,8 +426,8 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     std::vector<float3> vert;
 
 
-    vertexBuffer.alloc_and_upload(model.vertex);
-    indexBuffer.alloc_and_upload(model.index);
+    vertexBuffer.alloc_and_upload(arr);
+    indexBuffer.alloc_and_upload(ind);
 
 
     
@@ -440,12 +446,12 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
       
     triangleInput.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
     triangleInput.triangleArray.vertexStrideInBytes = sizeof(float3);
-    triangleInput.triangleArray.numVertices         = (int)model.vertex.size();
+    triangleInput.triangleArray.numVertices         = (int)arr.size();
     triangleInput.triangleArray.vertexBuffers       = &d_vertices;
     
     triangleInput.triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
     triangleInput.triangleArray.indexStrideInBytes  = sizeof(int3);
-    triangleInput.triangleArray.numIndexTriplets    = (int)model.index.size();
+    triangleInput.triangleArray.numIndexTriplets    = (int)ind.size();
     triangleInput.triangleArray.indexBuffer         = d_indices;
     
     uint32_t triangleInputFlags[1] = { 0 };

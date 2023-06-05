@@ -90,50 +90,29 @@ extern "C" __global__ void __miss__constant_bg()
 
 extern "C" __global__ void __closesthit__mesh()
 {
-    const int primID = optixGetPrimitiveIndex();
-//     //  const HitGroupData &sbtData = *(const HitGroupData*)optixGetSbtDataPointer();
-//      const HitGroupData* hit_group_data = reinterpret_cast<HitGroupData*>( optixGetSbtDataPointer() );
+     const int primID = optixGetPrimitiveIndex();
+    //  const HitGroupData &sbtData = *(const HitGroupData*)optixGetSbtDataPointer();
+     const HitGroupData* hit_group_data = reinterpret_cast<HitGroupData*>( optixGetSbtDataPointer() );
 
-//     const Face face1 = hit_group_data->face[primID];
+    const Face face1 = hit_group_data->face[primID];
 
-
-//     int2 elemIDs = face1.elemIDs;
-//      int elemID = optixIsTriangleBackFaceHit() ? elemIDs.x : elemIDs.y;
-//      int tost = elemID;
-
-//    // int tost = face1.elemIDs.x;
-
-
-
-
-    // switch(primID){
-    //     case 0:
-    //         setPayload(  make_float3( 1.0f, 0.f, 0.f));
-    //         break;
-    //     case 1:
-    //         setPayload(  make_float3( 0.0f, 1.f, 0.f));
-    //         break;
-    //     case 2:
-    //         setPayload(  make_float3( 0.f, 0.0f, 1.f));
-    //         break;
-    //     case 3:
-    //         setPayload(  make_float3( 1.f, 1.0f, 1.f));
-    //         break;
-    //     case 4:
-    //         setPayload(  make_float3( 1.f, 0.0f, 1.f));
-    //         break;
-    //     case 5:
-    //         setPayload(  make_float3( 0.f, 1.0f, 1.f));
-    //         break;
-    //     case 6:
-    //         setPayload(  make_float3( 1.f, 1.0f, 0.f));
-    //         break;
-    //     case 7:
-    //         setPayload(  make_float3( 1.f, 0.0f, 0.f));
-    //         break;
+    int2 elemIDs = face1.elemIDs;
+     int elemID = optixIsTriangleBackFaceHit() ? elemIDs.x : elemIDs.y;
     
+
+
+
+
+    switch(elemID){
+        case 0:
+            setPayload(  make_float3( 1.0f, 0.f, 0.f));
+            break;
+        case 1:
+            setPayload(  make_float3( 0.0f, 1.f, 0.f));
+            break;
+        case -1:
+            setPayload(  make_float3( 0.f, 1.0f, 0.f));
+            break;
     
-    
-    // }
-    setPayload(  make_float3( 1.f, 0.0f, 0.f));
+    }
 }
