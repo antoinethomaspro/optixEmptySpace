@@ -31,6 +31,17 @@
 #include <sutil/vec_math.h>
 #include <cuda/GeometryData.h>
 
+// Define the Triangle structure
+struct Triangle {
+    int3 index;
+};
+
+struct Face {
+    int3 index;
+    int2 elemIDs;
+};
+
+
 enum RayType
 {
     RAY_TYPE_RADIANCE  = 0,
@@ -38,10 +49,13 @@ enum RayType
     RAY_TYPE_COUNT = 1
 };
 
+
 struct HitGroupData
 {
-    // No data needed
+    int2 *elemIDs;
 };
+
+
 
 struct Sphere
 {
