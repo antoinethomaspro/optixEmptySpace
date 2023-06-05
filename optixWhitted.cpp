@@ -353,19 +353,25 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     std::vector<int3> index;
 };
     std::vector<float3> arr = {{    //on traitera ça à la fin
-    { 0.f, 0.f, 0.0f },
-    { 5.f, 0.f, 0.0f},
-    { 0.0f, 5.f, 0.f},
-    { 0.0f, 0.f, 5.f}
+    { 0.f, 0.f, 0.f },
+    { 5.f, 0.f, 0.f },
+    { 0.f, 5.f, 0.f },
+    { 0.f, 0.f, 5.f },
+    {0.f, -5.f,  0.f},
+    {-10.f, 0.f, 0.f} 
         }};
 
     Element element0;
     element0.fillTriangles({ 0, 1, 2, 3 });
     element0.elemID = 0;
 
+    Element element1;
+    element1.fillTriangles({ 0, 1, 6, 2 });
+    element1.elemID = 1;
+
 
     // Call the fillFaceBuffer function
-    fillFaceBuffer({element0}, faceBuffer);
+    fillFaceBuffer({element0, element1}, faceBuffer);
 
     std::vector<int3> index;
     for (const auto& face : faceBuffer) {
@@ -375,6 +381,18 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     std::cout << "Triangles of element0:" << std::endl;
     for (const auto& triangle : element0.triangles) {
     std::cout << triangle.index.x << ", " << triangle.index.y << ", " << triangle.index.z << std::endl;
+    }
+
+    std::cout << "Triangles of element1:" << std::endl;
+    for (const auto& triangle : element1.triangles) {
+    std::cout << triangle.index.x << ", " << triangle.index.y << ", " << triangle.index.z << std::endl;
+    }
+
+    std::cout << "Faces in faceBuffer:" << std::endl;
+    for (const auto& face : faceBuffer) {
+    std::cout << "Face Index: (" << face.index.x << ", " << face.index.y << ", " << face.index.z << ")" << std::endl;
+    std::cout << "ElemIDs: " << face.elemIDs.x << ", " << face.elemIDs.y << std::endl;
+    std::cout << "--------------" << std::endl;
     }
 
 
@@ -409,7 +427,8 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     
     triangleInput.triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
     triangleInput.triangleArray.indexStrideInBytes  = sizeof(int3);
-    triangleInput.triangleArray.numIndexTriplets    = (int)element0.triangles.size();
+    //(int)element0.triangles.size()
+    triangleInput.triangleArray.numIndexTriplets    = 7;
     triangleInput.triangleArray.indexBuffer         = d_indices;
     
     uint32_t triangleInputFlags[1] = { 0 };

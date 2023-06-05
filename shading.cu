@@ -110,6 +110,9 @@ extern "C" __global__ void __closesthit__mesh()
         case 0:
             setPayload(  make_float3( 1.0f, 0.f, 0.f));
             break;
+        case 1:
+            setPayload(  make_float3( 0.0f, 1.f, 0.f));
+            break;
         case -1:
             setPayload(  make_float3( 0.f, 1.0f, 0.f));
             break;
