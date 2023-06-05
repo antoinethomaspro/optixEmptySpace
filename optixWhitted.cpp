@@ -372,7 +372,12 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     std::vector<int3> index;
     for (const auto& face : faceBuffer) {
     index.push_back(face.index);
-}
+    }   
+
+    std::cout << "Triangles of element0:" << std::endl;
+    for (const auto& triangle : element0.triangles) {
+    std::cout << triangle.index.x << ", " << triangle.index.y << ", " << triangle.index.z << std::endl;
+    }
 
 
 
