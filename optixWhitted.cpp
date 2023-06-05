@@ -363,6 +363,17 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     element0.fillTriangles({ 0, 1, 2, 3 });
     element0.elemID = 0;
 
+    // Create an empty vector to store the faces
+    std::vector<Face> faceBuffer;
+
+    // Call the fillFaceBuffer function
+    fillFaceBuffer({element0}, faceBuffer);
+
+    std::vector<int3> index;
+    for (const auto& face : faceBuffer) {
+    index.push_back(face.index);
+}
+
 
 
     CUDABuffer vertexBuffer;
@@ -370,7 +381,7 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
 
 
     vertexBuffer.alloc_and_upload(arr);
-    indexBuffer.alloc_and_upload(element0.triangles);
+    indexBuffer.alloc_and_upload(index);
 
     
 
