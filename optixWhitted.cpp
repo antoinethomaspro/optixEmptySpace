@@ -344,7 +344,7 @@ static void sphere_bound(float3 center, float radius, float result[6])
 
 
 
-static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle)
+static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle, std::vector<Face> &faceBuffer )
 {
    
     class TriangleMesh {
@@ -363,8 +363,6 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     element0.fillTriangles({ 0, 1, 2, 3 });
     element0.elemID = 0;
 
-    // Create an empty vector to store the faces
-    std::vector<Face> faceBuffer;
 
     // Call the fillFaceBuffer function
     fillFaceBuffer({element0}, faceBuffer);
@@ -811,7 +809,7 @@ void syncCameraDataToSbt( WhittedState &state, const CameraData& camData )
     ) );
 }
 
-void createSBT( WhittedState &state )
+void createSBT( WhittedState &state , const std::vector<Face> &faces )
 {
     // Raygen program record
     {
@@ -853,28 +851,28 @@ void createSBT( WhittedState &state )
 
      
     {
-        Element element0;
-        element0.fillTriangles({ 0, 1, 2, 3 });
-        element0.elemID = 0;
+        // Element element0;
+        // element0.fillTriangles({ 0, 1, 2, 3 });
+        // element0.elemID = 0;
 
-        // Create an empty vector to store the faces
-        std::vector<Face> faces;
+        // // Create an empty vector to store the faces
+        // std::vector<Face> faces;
 
-        // Call the fillFaceBuffer function
-        fillFaceBuffer({element0}, faces);
+        // // Call the fillFaceBuffer function
+        // fillFaceBuffer({element0}, faces);
 
         // Face face1;
         // face1.elemIDs.x = 0;
-        // face1.elemIDs.y = -1;
+        // face1.elemIDs.y = 4;
         // Face face2;
         // face2.elemIDs.x = 1;
-        // face2.elemIDs.y = -1;
+        // face2.elemIDs.y = 4;
         // Face face3;
         // face3.elemIDs.x = 2;
-        // face3.elemIDs.y = -1;
+        // face3.elemIDs.y = 4;
         // Face face4;
         // face4.elemIDs.x = 3;
-        // face4.elemIDs.y = -1;
+        // face4.elemIDs.y = 4;
 
         // std::vector<Face> faces;
         // faces.push_back(face1);
@@ -1106,14 +1104,17 @@ int main( int argc, char* argv[] )
         //
         // Set up OptiX state
         //
+
+        std::vector<Face> faces;
+
         createContext  ( state );
 
        // buildMesh( state, state.gas_handle, state.d_gas_output_buffer);
 
-        buildTriangle(state, state.gas_handle);
+        buildTriangle(state, state.gas_handle, faces);
   
         createPipeline ( state );
-        createSBT      ( state );
+        createSBT      ( state, faces );
 
         initLaunchParams( state );
 
