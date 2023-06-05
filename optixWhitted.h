@@ -52,7 +52,7 @@ enum RayType
 
 struct HitGroupData
 {
-    int2 *elemIDs;
+    Face *face;
 };
 
 

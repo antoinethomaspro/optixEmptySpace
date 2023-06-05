@@ -90,8 +90,19 @@ extern "C" __global__ void __miss__constant_bg()
 
 extern "C" __global__ void __closesthit__mesh()
 {
-const int   primID = optixGetPrimitiveIndex();
-    switch(primID){
+
+
+     const HitGroupData &sbtData = *(const HitGroupData*)optixGetSbtDataPointer();
+     const HitGroupData* hit_group_data = reinterpret_cast<HitGroupData*>( optixGetSbtDataPointer() );
+
+    const Face face1 = hit_group_data->face[3];
+    int tost = face1.elemIDs.x;
+
+
+
+
+// const int   primID = optixGetPrimitiveIndex();
+    switch(tost){
         case 0:
             setPayload(  make_float3( 1.0f, 0.f, 0.f));
             break;

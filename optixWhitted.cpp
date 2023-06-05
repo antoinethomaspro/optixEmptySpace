@@ -162,7 +162,7 @@ struct Record
 
 typedef Record<CameraData>      RayGenRecord;
 typedef Record<MissData>        MissRecord;
-typedef Record<HitGroupData>   HitGroupSbtRecord;
+typedef Record<HitGroupData>    HitGroupSbtRecord;
 
 
 struct WhittedState
@@ -853,12 +853,36 @@ void createSBT( WhittedState &state )
 
      
     {
+        Face face1;
+        face1.elemIDs.x = 0;
+        face1.elemIDs.y = -1;
+        Face face2;
+        face2.elemIDs.x = 1;
+        face2.elemIDs.y = -1;
+        Face face3;
+        face3.elemIDs.x = 2;
+        face3.elemIDs.y = -1;
+        Face face4;
+        face4.elemIDs.x = 3;
+        face4.elemIDs.y = -1;
+
+        std::vector<Face> faces;
+        faces.push_back(face1);
+        faces.push_back(face2);
+        faces.push_back(face3);
+        faces.push_back(face4); 
+        
+        
+        CUDABuffer faceBuffer;
+        faceBuffer.alloc_and_upload(faces);
 
 
         CUdeviceptr hitgroup_record;
         size_t      hitgroup_record_size = sizeof( HitGroupSbtRecord );
         CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &hitgroup_record ), hitgroup_record_size ) );
+
         HitGroupSbtRecord hg_sbt;
+        hg_sbt.data.face = (Face*)faceBuffer.d_pointer();
         OPTIX_CHECK( optixSbtRecordPackHeader( state.mesh_hit_prog_group, &hg_sbt ) );
         CUDA_CHECK( cudaMemcpy(
                     reinterpret_cast<void*>( hitgroup_record ),
