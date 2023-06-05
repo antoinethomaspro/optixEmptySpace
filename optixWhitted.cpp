@@ -376,54 +376,11 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     {5.f, 5.f, 5.f }
         }};
 
-    class TriangleMesh {
-    public:
-    std::vector<float3> vertex;
-    std::vector<int3> index;
-
-    void convertTetrahedronToTriangles(const std::vector<int>& tetraIndices) {
-        for (size_t i = 0; i < tetraIndices.size(); i += 4) {
-            int a = tetraIndices[i];
-            int b = tetraIndices[i + 1];
-            int c = tetraIndices[i + 2];
-            int d = tetraIndices[i + 3];
-
-            // Triangle 1
-            int3 tri1 = { a, b, c };
-            index.push_back(tri1);
-
-            // Triangle 2
-            int3 tri2 = { a, c, d };
-            index.push_back(tri2);
-
-            // Triangle 3
-            int3 tri3 = { a, d, b };
-            index.push_back(tri3);
-
-            // Triangle 4
-            int3 tri4 = { b, d, c };
-            index.push_back(tri4);
-        }
-    }
-};
-
-    TriangleMesh model;
-    for (const auto& vertex : arr) {
-    model.vertex.push_back(vertex);
-    }
-
-    std::vector<int> tetraIndices = {
-        0, 1, 2, 3,
-        0, 1, 6, 2
-    };
-
-
-    model.convertTetrahedronToTriangles(tetraIndices);
 
     CUDABuffer vertexBuffer;
     CUDABuffer indexBuffer;
 
-    std::vector<float3> vert;
+
 
 
     vertexBuffer.alloc_and_upload(arr);
