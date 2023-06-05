@@ -75,48 +75,23 @@ extern "C" __global__ void __closesthit__mesh()
 
     const int primID = optixGetPrimitiveIndex();
 
-    const TetrahedronIndex* hit_group_data = reinterpret_cast<TetrahedronIndex*>( optixGetSbtDataPointer() );
+    const HitGroupData* hit_group_data = reinterpret_cast<HitGroupData*>( optixGetSbtDataPointer() );
+
+    const Face face = hit_group_data->face[primID];
+
+    int2 elemIDs = face.elemIDs;
+
+    int elemID = optixIsTriangleBackFaceHit() ? elemIDs.x : elemIDs.y;
+    if (elemID < 0) return;
     
-    const Face face1 = hit_group_data->faces[primID];
-    int elemID = optixIsTriangleBackFaceHit()? face1.elemIDs.x : face1.elemIDs.y;
 
-    // float floatNum = static_cast<float>(elemID);
+     switch(elemID){
+        case 0:
+            setPayload( payload + make_float3( 0.1f, 0.f, 0.f));
+            break;
+        case 1:
+            setPayload( payload + make_float3( 0.f, 1.f, 0.f));
+            break;
+     }
 
-
-
-    if (elemID < 0) {
-        return;
-    } else {
-        setPayload(  payload + make_float3( 0.1f, 0.f, 0.f));
-    }
-
-    // setPayload(  payload + make_float3( 1.f, 0.f, 0.f));
-
-
-
-
-    // const HitGroupData &sbtData
-    //   = *(const HitGroupData*)optixGetSbtDataPointer();
-
-    // const float3 color = sbtData.color;
-    // setPayload(  payload + color);
-
-
-// float3  payload = getPayload();
-
-// const int   primID = optixGetPrimitiveIndex();
-//     switch(primID){
-//         case 0:
-//             setPayload(  payload + make_float3( 1.0f, 0.f, 0.f));
-//             break;
-//         case 1:
-//             setPayload(  payload + make_float3( 0.f, 1.0f, 0.f));
-//             break;
-//         case 2:
-//             setPayload(  payload + make_float3( 0.f, 0.f, 1.0f));
-//             break;
-//         case 3:
-//             setPayload(  payload + make_float3( 0., 1., 1.));
-//             break;
-   // }
 }

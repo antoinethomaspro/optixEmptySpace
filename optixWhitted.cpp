@@ -57,7 +57,68 @@
  
 
 
+struct Element {
+    std::vector<Triangle> triangles;
+    int elemID;
 
+    // Function to fill the triangles based on input indices
+    void fillTriangles(const std::vector<int>& indices) {
+        // Check if the input vector has exactly 4 indices
+        if (indices.size() != 4) {
+            std::cout << "Invalid number of indices. Tetrahedron requires exactly 4 indices." << std::endl;
+            return;
+        }
+
+        // Create the four triangles based on the indices
+        Triangle triangle1;
+        triangle1.index = { indices[0], indices[1], indices[2] };
+        triangles.push_back(triangle1);
+
+        Triangle triangle2;
+        triangle2.index = { indices[0], indices[3], indices[1] };
+        triangles.push_back(triangle2);
+
+        Triangle triangle3;
+        triangle3.index = { indices[1], indices[3], indices[2] };
+        triangles.push_back(triangle3);
+
+        Triangle triangle4;
+        triangle4.index = { indices[2], indices[3], indices[0] };
+        triangles.push_back(triangle4);
+    }
+};
+
+bool areTrianglesEqual(const int3& triangle1, const int3& triangle2) {
+    std::vector<int> indices1 = { triangle1.x, triangle1.y, triangle1.z };
+    std::vector<int> indices2 = { triangle2.x, triangle2.y, triangle2.z };
+
+    std::sort(indices1.begin(), indices1.end());
+    std::sort(indices2.begin(), indices2.end());
+
+    return indices1 == indices2;
+}
+
+void fillFaceBuffer(const std::vector<Element>& elements, std::vector<Face>& faceBuffer) {
+    for (const Element& element : elements) {
+        for (const Triangle& triangle : element.triangles) {
+            bool found = false;
+            for (Face& face : faceBuffer) {
+                if (areTrianglesEqual(triangle.index, face.index)) {
+                    face.elemIDs.y = element.elemID;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                Face newFace;
+                newFace.index = triangle.index;
+                newFace.elemIDs.x = element.elemID;
+                newFace.elemIDs.y = -1;
+                faceBuffer.push_back(newFace);
+            }
+        }
+    }
+}
 
 
 
@@ -81,6 +142,8 @@ int32_t           mouse_button = -1;
 
 const int         max_trace = 12;
 
+
+
 //------------------------------------------------------------------------------
 //
 // Local types
@@ -99,7 +162,7 @@ struct Record
 
 typedef Record<CameraData>      RayGenRecord;
 typedef Record<MissData>        MissRecord;
-typedef Record<TetrahedronIndex>    HitGroupRecord;
+typedef Record<HitGroupData>    HitGroupSbtRecord;
 
 
 struct WhittedState
@@ -279,40 +342,72 @@ static void sphere_bound(float3 center, float radius, float result[6])
     };
 }
 
-static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle)
+
+
+static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle, std::vector<Face> &faceBuffer )
 {
-    std::vector<float3> arr = {{
-    { 0.f, 0.f, 0.0f },
-    { 5.f, 0.f, 0.0f},
-    { 0.0f, 5.f, 0.f},
-    { 0.0f, 0.f, -5.f},
-        }};
-
-    std::vector<int3> indices = { {0, 1, 2}, {0, 2, 3}, {1, 3, 2}, {0,3,1}};
-
-
+   
     class TriangleMesh {
     public:
     std::vector<float3> vertex;
     std::vector<int3> index;
-        };
+};
+    std::vector<float3> arr = {{    //on traitera ça à la fin
+    { 0.f, 0.f, 0.f },
+    { 5.f, 0.f, 0.f },
+    { 0.f, 5.f, 0.f },
+    { 0.f, 0.f, 5.f },
+    {0.f, -5.f,  0.f},
+    {-5.f, 0.f, 0.f} 
+    // {0.f, 0.f, -5.f},
+    // {5.f, 5.f, 5.f }
+        }};
 
-    TriangleMesh model;
-    for (const auto& vertex : arr) {
-    model.vertex.push_back(vertex);
-    }
+    Element element0;
+    element0.fillTriangles({ 0, 1, 2, 3 });
+    element0.elemID = 0;
+     Element element1;
+    element1.fillTriangles({ 0, 1, 6, 2 });
+    element1.elemID = 1;
 
-    for (const auto& index : indices) {
-    model.index.push_back(index);
-    }
+
+    // Call the fillFaceBuffer function
+    fillFaceBuffer({element0, element1}, faceBuffer);
+
+
+    std::vector<int3> index;
+    for (const auto& face : faceBuffer) {
+    index.push_back(face.index);
+    }   
+
+    // std::cout << "Triangles of element0:" << std::endl;
+    // for (const auto& triangle : element0.triangles) {
+    // std::cout << triangle.index.x << ", " << triangle.index.y << ", " << triangle.index.z << std::endl;
+    // }
+
+    // std::cout << "Triangles of element1:" << std::endl;
+    // for (const auto& triangle : element1.triangles) {
+    // std::cout << triangle.index.x << ", " << triangle.index.y << ", " << triangle.index.z << std::endl;
+    // }
+
+    std::cout << "Faces in faceBuffer:" << std::endl;
+    for (const auto& face : faceBuffer) {
+    std::cout << "Face Index: (" << face.index.x << ", " << face.index.y << ", " << face.index.z << ")" << std::endl;
+    std::cout << "ElemIDs: " << face.elemIDs.x << ", " << face.elemIDs.y << std::endl;
+    std::cout << "--------------" << std::endl;
+}
+
+
 
 
     CUDABuffer vertexBuffer;
     CUDABuffer indexBuffer;
 
 
-    vertexBuffer.alloc_and_upload(model.vertex);
-    indexBuffer.alloc_and_upload(model.index);
+    vertexBuffer.alloc_and_upload(arr);
+    indexBuffer.alloc_and_upload(index);
+
+    
 
     
 
@@ -330,12 +425,12 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
       
     triangleInput.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
     triangleInput.triangleArray.vertexStrideInBytes = sizeof(float3);
-    triangleInput.triangleArray.numVertices         = (int)model.vertex.size();
+    triangleInput.triangleArray.numVertices         = (int)arr.size();
     triangleInput.triangleArray.vertexBuffers       = &d_vertices;
     
     triangleInput.triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
     triangleInput.triangleArray.indexStrideInBytes  = sizeof(int3);
-    triangleInput.triangleArray.numIndexTriplets    = (int)model.index.size();
+    triangleInput.triangleArray.numIndexTriplets    = (int)element0.triangles.size();
     triangleInput.triangleArray.indexBuffer         = d_indices;
     
     uint32_t triangleInputFlags[1] = { 0 };
@@ -735,7 +830,7 @@ void syncCameraDataToSbt( WhittedState &state, const CameraData& camData )
     ) );
 }
 
-void createSBT( WhittedState &state )
+void createSBT( WhittedState &state , const std::vector<Face> &faces )
 {
     // Raygen program record
     {
@@ -777,53 +872,46 @@ void createSBT( WhittedState &state )
 
      
     {
-        Face face1;
-        face1.elemIDs.x = 1;
-        face1.elemIDs.y = -1;
-        Face face2;
-        face2.elemIDs.x = 2;
-        face2.elemIDs.y = -1;
-        Face face3;
-        face3.elemIDs.x = 3;
-        face3.elemIDs.y = -1;
-        Face face4;
-        face4.elemIDs.x = 4;
-        face4.elemIDs.y = -1;
+        // Element element0;
+        // element0.fillTriangles({ 0, 1, 2, 3 });
+        // element0.elemID = 0;
 
-        std::vector<Face> faces;
-        faces.push_back(face1);
-        faces.push_back(face2);
-        faces.push_back(face3);
-        faces.push_back(face4);
+        // // Create an empty vector to store the faces
+        // std::vector<Face> faces;
 
+        // // Call the fillFaceBuffer function
+        // fillFaceBuffer({element0}, faces);
 
+        // Face face1;
+        // face1.elemIDs.x = 0;
+        // face1.elemIDs.y = 4;
+        // Face face2;
+        // face2.elemIDs.x = 1;
+        // face2.elemIDs.y = 4;
+        // Face face3;
+        // face3.elemIDs.x = 2;
+        // face3.elemIDs.y = 4;
+        // Face face4;
+        // face4.elemIDs.x = 3;
+        // face4.elemIDs.y = 4;
 
-        //
-
-         std::vector<int> indices = {0, 1, 2, 3,
-                                    0, 1, 6, 2, 
-                                    0, 3, 2, 5, 
-                                    0, 1, 3, 4, 
-                                    3, 1, 2, 7};
-
-
-
+        // std::vector<Face> faces;
+        // faces.push_back(face1);
+        // faces.push_back(face2);
+        // faces.push_back(face3);
+        // faces.push_back(face4); 
         
-        CUDABuffer indexBuffer;
-        indexBuffer.alloc_and_upload(indices);
-
+        
         CUDABuffer faceBuffer;
         faceBuffer.alloc_and_upload(faces);
 
-        
+
         CUdeviceptr hitgroup_record;
-        size_t      hitgroup_record_size = sizeof( HitGroupRecord );
+        size_t      hitgroup_record_size = sizeof( HitGroupSbtRecord );
         CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &hitgroup_record ), hitgroup_record_size ) );
 
-        HitGroupRecord hg_sbt;
-        hg_sbt.data.indices = (int*)indexBuffer.d_pointer();   //retourne un pointeur sur le cudabuffer
-        hg_sbt.data.faces = (Face*)faceBuffer.d_pointer();
-
+        HitGroupSbtRecord hg_sbt;
+        hg_sbt.data.face = (Face*)faceBuffer.d_pointer();
         OPTIX_CHECK( optixSbtRecordPackHeader( state.mesh_hit_prog_group, &hg_sbt ) );
         CUDA_CHECK( cudaMemcpy(
                     reinterpret_cast<void*>( hitgroup_record ),
@@ -833,7 +921,7 @@ void createSBT( WhittedState &state )
                     ) );
 
         state.sbt.hitgroupRecordBase            = hitgroup_record;  //ok
-        state.sbt.hitgroupRecordStrideInBytes   = sizeof( HitGroupRecord );
+        state.sbt.hitgroupRecordStrideInBytes   = sizeof( HitGroupSbtRecord );
         state.sbt.hitgroupRecordCount           = 1;
 
     }
@@ -1037,14 +1125,17 @@ int main( int argc, char* argv[] )
         //
         // Set up OptiX state
         //
+
+        std::vector<Face> faces;
+
         createContext  ( state );
 
        // buildMesh( state, state.gas_handle, state.d_gas_output_buffer);
 
-        buildTriangle(state, state.gas_handle);
+        buildTriangle(state, state.gas_handle, faces);
   
         createPipeline ( state );
-        createSBT      ( state );
+        createSBT      ( state, faces );
 
         initLaunchParams( state );
 
