@@ -127,7 +127,7 @@ void displayTriangleMesh(const TriangleMesh& model) {
 
 
 struct Element {
-    std::vector<Triangle> triangles;
+    std::vector<int3> triangles;
     int elemID;
 
     // Function to fill the triangles based on input indices
@@ -139,20 +139,20 @@ struct Element {
         }
 
         // Create the four triangles based on the indices
-        Triangle triangle1;
-        triangle1.index = { indices[0], indices[1], indices[2] };
+        int3 triangle1;
+        triangle1 = { indices[0], indices[2], indices[1] };
         triangles.push_back(triangle1);
 
-        Triangle triangle2;
-        triangle2.index = { indices[0], indices[3], indices[1] };
+        int3 triangle2;
+        triangle2 = { indices[0], indices[1], indices[3] };
         triangles.push_back(triangle2);
 
-        Triangle triangle3;
-        triangle3.index = { indices[1], indices[3], indices[2] };
+        int3 triangle3;
+        triangle3 = { indices[1], indices[2], indices[3] };
         triangles.push_back(triangle3);
 
-        Triangle triangle4;
-        triangle4.index = { indices[2], indices[3], indices[0] };
+        int3 triangle4;
+        triangle4 = { indices[2], indices[0], indices[3] };
         triangles.push_back(triangle4);
     }
 };
@@ -167,27 +167,27 @@ bool areTrianglesEqual(const int3& triangle1, const int3& triangle2) {
     return indices1 == indices2;
 }
 
-void fillFaceBuffer(const std::vector<Element>& elements, std::vector<Face>& faceBuffer) {
-    for (const Element& element : elements) {
-        for (const Triangle& triangle : element.triangles) {
-            bool found = false;
-            for (Face& face : faceBuffer) {
-                if (areTrianglesEqual(triangle.index, face.index)) {
-                    face.elemIDs.y = element.elemID;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                Face newFace;
-                newFace.index = triangle.index;
-                newFace.elemIDs.x = element.elemID;
-                newFace.elemIDs.y = -1;
-                faceBuffer.push_back(newFace);
-            }
-        }
-    }
-}
+// void fillFaceBuffer(const std::vector<Element>& elements, std::vector<Face>& faceBuffer) {
+//     for (const Element& element : elements) {
+//         for (const Triangle& triangle : element.triangles) {
+//             bool found = false;
+//             for (Face& face : faceBuffer) {
+//                 if (areTrianglesEqual(triangle.index, face.index)) {
+//                     face.elemIDs.y = element.elemID;
+//                     found = true;
+//                     break;
+//                 }
+//             }
+//             if (!found) {
+//                 Face newFace;
+//                 newFace.index = triangle.index;
+//                 newFace.elemIDs.x = element.elemID;
+//                 newFace.elemIDs.y = -1;
+//                 faceBuffer.push_back(newFace);
+//             }
+//         }
+//     }
+// }
 
 
 
@@ -401,6 +401,28 @@ void initLaunchParams( WhittedState& state )
 
 static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle, std::vector<Face> &faceBuffer )
 {   
+    Element element0;
+    element0.fillTriangles({ 0, 1, 2, 3 });
+    element0.elemID = 0;
+
+    std::vector<float3> arr = {{    //on traitera ça à la fin
+    { 0.f, 0.f, 0.0f },
+    { 5.f, 0.f, 0.0f},
+    { 0.0f, 5.f, 0.f},
+    { 0.0f, 0.f, 5.f},
+    {0.f, -5.f,  0.f},
+    {-5.f, 0.f, 0.f} ,
+    {0.f, 0.f, -5.f},
+    {5.f, 5.f, 5.f }
+        }};
+
+
+    TriangleMesh model1;
+    model1.index = element0.triangles;
+    model1.vertex = arr;
+
+    
+
     /*! the model we are going to trace rays against */
     std::vector<TriangleMesh> meshes;
     /*! one buffer per input mesh */
@@ -411,11 +433,13 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     //CUDABuffer asBuffer;
 
 
-    TriangleMesh model1;
-    model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
+    // TriangleMesh model1;
+    // model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
 
     TriangleMesh model2;
     model2.addCube(make_float3(-2.f, 2.f, 2.f), make_float3(0.f, 4.f, 0.f));
+
+    
 
     meshes.push_back(model1);
     meshes.push_back(model2);

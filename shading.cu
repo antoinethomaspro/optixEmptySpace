@@ -101,16 +101,17 @@ extern "C" __global__ void __closesthit__mesh()
     // int2 elemIDs = face1.elemIDs;
     //  int elemID = optixIsTriangleBackFaceHit() ? elemIDs.x : elemIDs.y;
     
-
-
-  
-    
-    if (primID % 2 == 0) {
+    if (optixIsTriangleFrontFaceHit() == true)
+        {
+             if (primID % 2 == 0) {
         return setPayload(  make_float3( 0.0f, 0.f, 0.f));
     } else {
         return setPayload(  make_float3( 1.0f, 0.f, 1.f));
     }
-
+        }
+  
+    
+    
 
     // switch(primID){
     //     case 0:
