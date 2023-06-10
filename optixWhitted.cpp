@@ -268,11 +268,7 @@ struct WhittedState
 //
 //------------------------------------------------------------------------------
 
-// Metal sphere, glass sphere, floor, light
-const Sphere g_sphere = {
-    { 2.0f, 1.5f, -2.5f }, // center
-    1.0f                   // radius
-};
+// ??? Camera Data???
 
 
 //------------------------------------------------------------------------------
@@ -408,8 +404,9 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
 
 
     TriangleMesh model;
-    model.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -8.f));
-    
+    model.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
+    model.addCube(make_float3(-2.f, 2.f, 2.f), make_float3(0.f, 4.f, 0.f));
+
 
     CUDABuffer vertexBuffer;
     CUDABuffer indexBuffer;
@@ -417,18 +414,17 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
 
     // displayTriangleMesh(model);
 
-    std::vector<float3> vertex = {make_float3(0.f, 0.f, -5.f), make_float3(5.f, 0.f, -5.f), make_float3(0.f, 5.f, -5.f), make_float3(5.f, 5.f, -5.f)};
-    std::vector<int3> index = {make_int3(0,1,2), make_int3(2,1,3)};
+
 
     vertexBuffer.alloc_and_upload(model.vertex);
     indexBuffer.alloc_and_upload(model.index);
 
 
-    
-
-     // ==================================================================
+    // ==================================================================
     // triangle inputs
     // ==================================================================
+
+    
    OptixBuildInput triangleInput = {};
     triangleInput.type
       = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
@@ -1028,7 +1024,7 @@ int main( int argc, char* argv[] )
 
         createContext  ( state );
 
-       // buildMesh( state, state.gas_handle, state.d_gas_output_buffer);
+       
 
         buildTriangle(state, state.gas_handle, faces);
   
