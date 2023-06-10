@@ -400,69 +400,83 @@ void initLaunchParams( WhittedState& state )
 
 
 static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle, std::vector<Face> &faceBuffer )
-{
+{   
+    /*! the model we are going to trace rays against */
+    std::vector<TriangleMesh> meshes;
+    /*! one buffer per input mesh */
+    std::vector<CUDABuffer> vertexBuffer;
+    /*! one buffer per input mesh */
+    std::vector<CUDABuffer> indexBuffer;
+    //! buffer that keeps the (final, compacted) accel structure
+    //CUDABuffer asBuffer;
 
 
-    TriangleMesh model;
-    model.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
-    model.addCube(make_float3(-2.f, 2.f, 2.f), make_float3(0.f, 4.f, 0.f));
+    TriangleMesh model1;
+    model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
+
+    TriangleMesh model2;
+    model2.addCube(make_float3(-2.f, 2.f, 2.f), make_float3(0.f, 4.f, 0.f));
+
+    meshes.push_back(model1);
+    meshes.push_back(model2);
+
+    
+    vertexBuffer.resize(meshes.size());
+    indexBuffer.resize(meshes.size());
 
 
-    CUDABuffer vertexBuffer;
-    CUDABuffer indexBuffer;
-
-
-    // displayTriangleMesh(model);
-
-
-
-    vertexBuffer.alloc_and_upload(model.vertex);
-    indexBuffer.alloc_and_upload(model.index);
 
 
     // ==================================================================
     // triangle inputs
     // ==================================================================
-
     
-   OptixBuildInput triangleInput = {};
-    triangleInput.type
+    std::vector<OptixBuildInput> triangleInput(meshes.size());
+    std::vector<CUdeviceptr> d_vertices(meshes.size());
+	std::vector<CUdeviceptr> d_indices(meshes.size());
+	std::vector<uint32_t> triangleInputFlags(meshes.size());
+
+    for (int meshID=0;meshID<meshes.size();meshID++) {
+    // upload the model to the device: the builder
+    TriangleMesh &model = meshes[meshID];
+    vertexBuffer[meshID].alloc_and_upload(model.vertex);
+    indexBuffer[meshID].alloc_and_upload(model.index);
+
+    triangleInput[meshID] = {};
+    triangleInput[meshID].type
       = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
     // create local variables, because we need a *pointer* to the
     // device pointers
-    CUdeviceptr d_vertices = vertexBuffer.d_pointer();
-    CUdeviceptr d_indices  = indexBuffer.d_pointer();
+    d_vertices[meshID] = vertexBuffer[meshID].d_pointer();
+    d_indices[meshID]  = indexBuffer[meshID].d_pointer();
       
-    triangleInput.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
-    triangleInput.triangleArray.vertexStrideInBytes = sizeof(float3);
-    //triangleInput.triangleArray.numVertices         = (int)vertex.size();
-    triangleInput.triangleArray.numVertices         = (int)model.vertex.size();
-
-    triangleInput.triangleArray.vertexBuffers       = &d_vertices;
+    triangleInput[meshID].triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
+    triangleInput[meshID].triangleArray.vertexStrideInBytes = sizeof(float3);
+    triangleInput[meshID].triangleArray.numVertices         = (int)model.vertex.size();
+    triangleInput[meshID].triangleArray.vertexBuffers       = &d_vertices[meshID];
     
-    triangleInput.triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-    triangleInput.triangleArray.indexStrideInBytes  = sizeof(int3);
-   // triangleInput.triangleArray.numIndexTriplets    = (int)index.size();
-    triangleInput.triangleArray.numIndexTriplets    = (int)model.index.size();
-
-    triangleInput.triangleArray.indexBuffer         = d_indices;
+    triangleInput[meshID].triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+    triangleInput[meshID].triangleArray.indexStrideInBytes  = sizeof(int3);
+    triangleInput[meshID].triangleArray.numIndexTriplets    = (int)model.index.size();
+    triangleInput[meshID].triangleArray.indexBuffer         = d_indices[meshID];
     
-    uint32_t triangleInputFlags[1] = { 0 };
+    triangleInputFlags[meshID] = 0 ;
     
     // in this example we have one SBT entry, and no per-primitive
     // materials:
-    triangleInput.triangleArray.flags               = triangleInputFlags;
-    triangleInput.triangleArray.numSbtRecords               = 1;
-    triangleInput.triangleArray.sbtIndexOffsetBuffer        = 0; 
-    triangleInput.triangleArray.sbtIndexOffsetSizeInBytes   = 0; 
-    triangleInput.triangleArray.sbtIndexOffsetStrideInBytes = 0; 
+    triangleInput[meshID].triangleArray.flags               = &triangleInputFlags[meshID];
+    triangleInput[meshID].triangleArray.numSbtRecords               = 1;
+    triangleInput[meshID].triangleArray.sbtIndexOffsetBuffer        = 0; 
+    triangleInput[meshID].triangleArray.sbtIndexOffsetSizeInBytes   = 0; 
+    triangleInput[meshID].triangleArray.sbtIndexOffsetStrideInBytes = 0; 
+    }
       
     // ==================================================================
     // BLAS setup
     // ==================================================================
     
-    OptixAccelBuildOptions accelOptions = {};
+   OptixAccelBuildOptions accelOptions = {};
     accelOptions.buildFlags             = OPTIX_BUILD_FLAG_NONE
       | OPTIX_BUILD_FLAG_ALLOW_COMPACTION
       ;
@@ -473,8 +487,8 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     OPTIX_CHECK(optixAccelComputeMemoryUsage
                 (state.context,
                  &accelOptions,
-                 &triangleInput,
-                 1,  // num_build_inputs
+                 triangleInput.data(),
+                 (int)meshes.size(),  // num_build_inputs
                  &blasBufferSizes
                  ));
 
@@ -502,8 +516,8 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     OPTIX_CHECK(optixAccelBuild(state.context,
                                 /* stream */0,
                                 &accelOptions,
-                                &triangleInput,
-                                1,  
+                                triangleInput.data(),
+                                (int)meshes.size(),
                                 tempBuffer.d_pointer(),
                                 tempBuffer.sizeInBytes,
                                 
@@ -766,57 +780,46 @@ void createSBT( WhittedState &state , const std::vector<Face> &faces )
 
      
     {
-        // Element element0;
-        // element0.fillTriangles({ 0, 1, 2, 3 });
-        // element0.elemID = 0;
+        // CUDABuffer hitgroupRecordsBuffer;
 
-        // // Create an empty vector to store the faces
-        // std::vector<Face> faces;
+        // std::vector<HitGroupSbtRecord> hitgroupRecords;
 
-        // // Call the fillFaceBuffer function
-        // fillFaceBuffer({element0}, faces);
+        // HitGroupSbtRecord rec1;
+        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec1));
+        // hitgroupRecords.push_back(rec1);
 
-        // Face face1;
-        // face1.elemIDs.x = 0;
-        // face1.elemIDs.y = 4;
-        // Face face2;
-        // face2.elemIDs.x = 1;
-        // face2.elemIDs.y = 4;
-        // Face face3;
-        // face3.elemIDs.x = 2;
-        // face3.elemIDs.y = 4;
-        // Face face4;
-        // face4.elemIDs.x = 3;
-        // face4.elemIDs.y = 4;
+        // HitGroupSbtRecord rec2;
+        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec2));
+        // hitgroupRecords.push_back(rec2);
 
-        // std::vector<Face> faces;
-        // faces.push_back(face1);
-        // faces.push_back(face2);
-        // faces.push_back(face3);
-        // faces.push_back(face4); 
+        // hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
+
+        // state.sbt.hitgroupRecordBase          = hitgroupRecordsBuffer.d_pointer();
+        // state.sbt.hitgroupRecordStrideInBytes = sizeof(HitGroupSbtRecord);
+        // state.sbt.hitgroupRecordCount         = (int)hitgroupRecords.size();
         
-        
-        CUDABuffer faceBuffer;
-        faceBuffer.alloc_and_upload(faces);
+        // CUDABuffer faceBuffer;
+        // faceBuffer.alloc_and_upload(faces);
 
+       ///  
 
-        CUdeviceptr hitgroup_record;
-        size_t      hitgroup_record_size = sizeof( HitGroupSbtRecord );
-        CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &hitgroup_record ), hitgroup_record_size ) );
+         CUDABuffer hitgroupRecordsBuffer;
 
-        HitGroupSbtRecord hg_sbt;
-        hg_sbt.data.face = (Face*)faceBuffer.d_pointer();
-        OPTIX_CHECK( optixSbtRecordPackHeader( state.mesh_hit_prog_group, &hg_sbt ) );
-        CUDA_CHECK( cudaMemcpy(
-                    reinterpret_cast<void*>( hitgroup_record ),
-                    &hg_sbt,
-                    hitgroup_record_size,
-                    cudaMemcpyHostToDevice
-                    ) );
+        std::vector<HitGroupSbtRecord> hitgroupRecords;
 
-        state.sbt.hitgroupRecordBase            = hitgroup_record;  //ok
-        state.sbt.hitgroupRecordStrideInBytes   = sizeof( HitGroupSbtRecord );
-        state.sbt.hitgroupRecordCount           = 1;
+        HitGroupSbtRecord rec1;
+        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec1));
+        hitgroupRecords.push_back(rec1);
+
+        HitGroupSbtRecord rec2;
+        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec2));
+        hitgroupRecords.push_back(rec2);
+
+        hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
+
+        state.sbt.hitgroupRecordBase          = hitgroupRecordsBuffer.d_pointer();
+        state.sbt.hitgroupRecordStrideInBytes = sizeof(HitGroupSbtRecord);
+        state.sbt.hitgroupRecordCount         = (int)hitgroupRecords.size();
 
     }
     
