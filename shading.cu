@@ -75,6 +75,7 @@ static __forceinline__ __device__ void setPayload( float3 p )
     optixSetPayload_2( float_as_int( p.z ) );
 }
 
+
 static __forceinline__ __device__ float3 getPayload()
 {
     return make_float3(
@@ -103,14 +104,22 @@ extern "C" __global__ void __closesthit__mesh()
   
 }
 
-extern "C" __global__ void __closesthit__mesh2()
+// extern "C" __global__ void __closesthit__mesh2() //handle primary rays
+// {
+
+//     float tmax = optixGetRayTmax();
+//     optixSetPayload_0( float_as_int(tmax) );
+
+// }
+
+extern "C" __global__ void __closesthit__mesh2() //handle primary rays
 {
-   
-  float3  payload = getPayload();
+
+    float3  payload = getPayload();
     const int primID = optixGetPrimitiveIndex();
 
     if(optixIsTriangleBackFaceHit() ==true)
-        {  setPayload( payload + make_float3( 0.f, 0.1f, 0.f));}
+        {  setPayload( payload + make_float3( 0.0f, 0.1f, 0.f));}
         else{return;}
 }
 

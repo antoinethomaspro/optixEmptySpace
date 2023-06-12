@@ -248,6 +248,8 @@ struct WhittedState
 {
     OptixDeviceContext          context                   = 0;
     OptixTraversableHandle      gas_handle                = {};
+    OptixTraversableHandle      gas_handle2                = {};
+
     CUdeviceptr                 d_gas_output_buffer       = {};
 
 
@@ -403,6 +405,7 @@ void initLaunchParams( WhittedState& state )
     CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &state.d_params ), sizeof( Params ) ) );
 
     state.params.handle = state.gas_handle;
+    state.params.handle2 = state.gas_handle2;
 }
 
 
@@ -427,7 +430,140 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     model2.addCube(make_float3(-1.f, -1.f, 1.f), make_float3(3.f, 3.f, -3.f));
 
     meshes.push_back(model1);
-    meshes.push_back(model2);
+   // meshes.push_back(model2);
+
+    
+    vertexBuffer.resize(meshes.size());
+    indexBuffer.resize(meshes.size());
+
+
+
+
+    // ==================================================================
+    // triangle inputs
+    // ==================================================================
+    
+    std::vector<OptixBuildInput> triangleInput(meshes.size());
+    std::vector<CUdeviceptr> d_vertices(meshes.size());
+	std::vector<CUdeviceptr> d_indices(meshes.size());
+	std::vector<uint32_t> triangleInputFlags(meshes.size());
+
+    for (int meshID=0;meshID<meshes.size();meshID++) {
+    // upload the model to the device: the builder
+    TriangleMesh &model = meshes[meshID];
+    vertexBuffer[meshID].alloc_and_upload(model.vertex);
+    indexBuffer[meshID].alloc_and_upload(model.index);
+
+    triangleInput[meshID] = {};
+    triangleInput[meshID].type
+      = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+
+    // create local variables, because we need a *pointer* to the
+    // device pointers
+    d_vertices[meshID] = vertexBuffer[meshID].d_pointer();
+    d_indices[meshID]  = indexBuffer[meshID].d_pointer();
+      
+    triangleInput[meshID].triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
+    triangleInput[meshID].triangleArray.vertexStrideInBytes = sizeof(float3);
+    triangleInput[meshID].triangleArray.numVertices         = (int)model.vertex.size();
+    triangleInput[meshID].triangleArray.vertexBuffers       = &d_vertices[meshID];
+    
+    triangleInput[meshID].triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+    triangleInput[meshID].triangleArray.indexStrideInBytes  = sizeof(int3);
+    triangleInput[meshID].triangleArray.numIndexTriplets    = (int)model.index.size();
+    triangleInput[meshID].triangleArray.indexBuffer         = d_indices[meshID];
+    
+    triangleInputFlags[meshID] = 0 ;
+    
+    // in this example we have one SBT entry, and no per-primitive
+    // materials:
+    triangleInput[meshID].triangleArray.flags               = &triangleInputFlags[meshID];
+    triangleInput[meshID].triangleArray.numSbtRecords               = 1;
+    triangleInput[meshID].triangleArray.sbtIndexOffsetBuffer        = 0; 
+    triangleInput[meshID].triangleArray.sbtIndexOffsetSizeInBytes   = 0; 
+    triangleInput[meshID].triangleArray.sbtIndexOffsetStrideInBytes = 0; 
+    }
+      
+    // ==================================================================
+    // BLAS setup
+    // ==================================================================
+    
+   OptixAccelBuildOptions accelOptions = {};
+    accelOptions.buildFlags             = OPTIX_BUILD_FLAG_NONE
+      | OPTIX_BUILD_FLAG_ALLOW_COMPACTION
+      ;
+    accelOptions.motionOptions.numKeys  = 1;
+    accelOptions.operation              = OPTIX_BUILD_OPERATION_BUILD;
+    
+    OptixAccelBufferSizes blasBufferSizes;
+    OPTIX_CHECK(optixAccelComputeMemoryUsage
+                (state.context,
+                 &accelOptions,
+                 triangleInput.data(),
+                 (int)meshes.size(),  // num_build_inputs
+                 &blasBufferSizes
+                 ));
+
+    // ==================================================================
+    // prepare compaction
+    // ==================================================================
+    
+    CUDABuffer compactedSizeBuffer;
+    compactedSizeBuffer.alloc(sizeof(uint64_t));
+    
+    OptixAccelEmitDesc emitDesc;
+    emitDesc.type   = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
+    emitDesc.result = compactedSizeBuffer.d_pointer();
+    
+    // ==================================================================
+    // execute build (main stage)
+    // ==================================================================
+    
+    CUDABuffer tempBuffer;
+    tempBuffer.alloc(blasBufferSizes.tempSizeInBytes);
+    
+    CUDABuffer outputBuffer;
+    outputBuffer.alloc(blasBufferSizes.outputSizeInBytes);
+      
+    OPTIX_CHECK(optixAccelBuild(state.context,
+                                /* stream */0,
+                                &accelOptions,
+                                triangleInput.data(),
+                                (int)meshes.size(),
+                                tempBuffer.d_pointer(),
+                                tempBuffer.sizeInBytes,
+                                
+                                outputBuffer.d_pointer(),
+                                outputBuffer.sizeInBytes,
+                                
+                                &gas_handle,
+                                
+                                &emitDesc,1
+                                ));
+    CUDA_SYNC_CHECK();
+
+}
+
+static void buildBox(const WhittedState &state, OptixTraversableHandle &gas_handle, std::vector<Face> &faceBuffer )
+{   
+    /*! the model we are going to trace rays against */
+    std::vector<TriangleMesh> meshes;
+    /*! one buffer per input mesh */
+    std::vector<CUDABuffer> vertexBuffer;
+    /*! one buffer per input mesh */
+    std::vector<CUDABuffer> indexBuffer;
+    //! buffer that keeps the (final, compacted) accel structure
+    //CUDABuffer asBuffer;
+
+
+    TriangleMesh model1;
+    model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
+
+    TriangleMesh model2;
+    model2.addCube(make_float3(-1.f, -1.f, 1.f), make_float3(3.f, 3.f, -3.f));
+
+    // meshes.push_back(model1);
+   meshes.push_back(model2);
 
     
     vertexBuffer.resize(meshes.size());
@@ -1068,6 +1204,7 @@ int main( int argc, char* argv[] )
        
 
         buildTriangle(state, state.gas_handle, faces);
+        buildBox(state, state.gas_handle2, faces);
   
         createPipeline ( state );
         createSBT      ( state, faces );

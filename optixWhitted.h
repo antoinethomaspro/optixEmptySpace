@@ -100,6 +100,7 @@ struct Params
     float        scene_epsilon;
 
     OptixTraversableHandle handle;
+    OptixTraversableHandle handle2;
 };
 
 
