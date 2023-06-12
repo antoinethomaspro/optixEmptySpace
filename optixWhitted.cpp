@@ -167,28 +167,36 @@ bool areTrianglesEqual(const int3& triangle1, const int3& triangle2) {
     return indices1 == indices2;
 }
 
-// void fillFaceBuffer(const std::vector<Element>& elements, std::vector<Face>& faceBuffer) {
-//     for (const Element& element : elements) {
-//         for (const Triangle& triangle : element.triangles) {
-//             bool found = false;
-//             for (Face& face : faceBuffer) {
-//                 if (areTrianglesEqual(triangle.index, face.index)) {
-//                     face.elemIDs.y = element.elemID;
-//                     found = true;
-//                     break;
-//                 }
-//             }
-//             if (!found) {
-//                 Face newFace;
-//                 newFace.index = triangle.index;
-//                 newFace.elemIDs.x = element.elemID;
-//                 newFace.elemIDs.y = -1;
-//                 faceBuffer.push_back(newFace);
-//             }
-//         }
-//     }
-// }
-
+void fillFaceBuffer(const std::vector<Element>& elements, std::vector<Face>& faceBuffer) {
+    for (const Element& element : elements) {
+        for (const int3& index : element.triangles) {
+            bool found = false;
+            for (Face& face : faceBuffer) {
+                if (areTrianglesEqual(index, face.index)) {
+                    if (face.elemIDs.y == -1) {
+                        face.elemIDs.y = element.elemID;
+                    } else {
+                        // Duplicate triangle found, create a new face entry
+                        Face newFace;
+                        newFace.index = index;
+                        newFace.elemIDs.x = element.elemID;
+                        newFace.elemIDs.y = -1;
+                        faceBuffer.push_back(newFace);
+                    }
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                Face newFace;
+                newFace.index = index;
+                newFace.elemIDs.x = element.elemID;
+                newFace.elemIDs.y = -1;
+                faceBuffer.push_back(newFace);
+            }
+        }
+    }
+}
 
 
 
@@ -416,7 +424,7 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
 
     TriangleMesh model2;
-    model2.addCube(make_float3(-2.f, 2.f, 2.f), make_float3(0.f, 4.f, 0.f));
+    model2.addCube(make_float3(-1.f, -1.f, 1.f), make_float3(3.f, 3.f, -3.f));
 
     meshes.push_back(model1);
     meshes.push_back(model2);

@@ -90,3 +90,6 @@ extern "C" __global__ void __raygen__pinhole_camera()
 
     params.frame_buffer[image_index] = make_color( payload_rgb );
 }
+
+
+
