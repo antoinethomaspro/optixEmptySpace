@@ -75,34 +75,30 @@ static __forceinline__ __device__ void setPayload( float3 p )
     optixSetPayload_2( float_as_int( p.z ) );
 }
 
+static __forceinline__ __device__ float3 getPayload()
+{
+    return make_float3(
+            int_as_float( optixGetPayload_0() ),
+            int_as_float( optixGetPayload_1() ),
+            int_as_float( optixGetPayload_2() )
+            );
+}
 
-
-// extern "C" __global__ void __closesthit__metal_radiance()
-// {
-//     setPayload( make_float3(1.f, 0.f, 0.f));
-// }
 
 extern "C" __global__ void __miss__constant_bg()
 {
-    const MissData* sbt_data = (MissData*) optixGetSbtDataPointer();
-    RadiancePRD prd = getRadiancePRD();
-    prd.result = sbt_data->bg_color;
-    setRadiancePRD(prd);
+   
 }
 
 extern "C" __global__ void __closesthit__mesh()
 {
+
+    float3  payload = getPayload();
     const int primID = optixGetPrimitiveIndex();
- 
-    
-    if (optixIsTriangleFrontFaceHit() == true)
-        {
-             if (primID % 2 == 0) {
-        return setPayload(  make_float3( 0.0f, 0.f, 0.f));
-    } else {
-        return setPayload(  make_float3( 1.0f, 0.f, 1.f));
-    }
-        }
+
+    if(optixIsTriangleBackFaceHit() ==true)
+        {  setPayload( payload + make_float3( 0.1f, 0.f, 0.f));}
+        else{return;}
 
   
 }
@@ -110,5 +106,42 @@ extern "C" __global__ void __closesthit__mesh()
 extern "C" __global__ void __closesthit__mesh2()
 {
    
-  setPayload(  make_float3( 1.0f, 0.f, 1.f));
+  float3  payload = getPayload();
+    const int primID = optixGetPrimitiveIndex();
+
+    if(optixIsTriangleBackFaceHit() ==true)
+        {  setPayload( payload + make_float3( 0.f, 0.1f, 0.f));}
+        else{return;}
 }
+
+
+
+// extern "C" __global__ void __closesthit__mesh()
+// {
+//     const int primID = optixGetPrimitiveIndex();
+ 
+    
+//     if (optixIsTriangleFrontFaceHit() == true)
+//         {
+//              if (primID % 2 == 0) {
+//         return setPayload(  make_float3( 0.0f, 0.f, 0.f));
+//     } else {
+//         return setPayload(  make_float3( 1.0f, 0.f, 1.f));
+//     }
+//         }
+// }
+
+// extern "C" __global__ void __closesthit__mesh2()
+// {
+//     const int primID = optixGetPrimitiveIndex();
+ 
+    
+//     if (optixIsTriangleFrontFaceHit() == true)
+//         {
+//              if (primID % 2 == 0) {
+//         return setPayload(  make_float3( 1.0f, 0.f, 0.f));
+//     } else {
+//         return setPayload(  make_float3( 1.0f, 1.f, 1.f));
+//     }
+//         }
+// }
