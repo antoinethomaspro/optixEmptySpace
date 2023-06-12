@@ -67,13 +67,11 @@ extern "C" __global__ void __raygen__pinhole_camera()
     //OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 
     
-    for (float i = 0.f; i < 10.f; i+=0.1f ) {
-
-    float3 origin = ray_origin + ray_direction*i;
+   
 
     optixTrace(
         params.handle2,
-        origin,
+        ray_origin,
         ray_direction,
         0.,
         1e16f,
@@ -87,11 +85,27 @@ extern "C" __global__ void __raygen__pinhole_camera()
         RAY_TYPE_RADIANCE,          // missSBTIndex 
         float3_as_args(payload_rgb));
 
+    
+
+    float res = payload_rgb.x ;
+    float color = payload_rgb.y ;
+
+    if (params.subframe_index == 0 &&
+        optixGetLaunchIndex().x == 0 &&
+        optixGetLaunchIndex().y == 0) {
+      printf("############################################\n");
+      printf("Hello world from OptiX 7 raygen program!\n(this is your res: %i !!!)\n",
+             res);
+      printf("############################################\n");
     }
 
-    float3 res = payload_rgb ;
 
-    // for (float i = 0.f; i < 10.f; i+=0.1f ) {
+    float3 finalColor = make_float3(color, 0.f, 0.f) ;
+
+    params.frame_buffer[image_index] = make_color( finalColor );
+
+
+   // for (float i = 0.f; i < 10.f; i+=0.1f ) {
 
     // float3 origin = ray_origin + ray_direction*i;
 
@@ -112,11 +126,6 @@ extern "C" __global__ void __raygen__pinhole_camera()
     //     float3_as_args(payload_rgb));
 
     // }
-
-    //float3 res2 = payload_rgb ;
-
-    params.frame_buffer[image_index] = make_color( res );
-
 }
 
 

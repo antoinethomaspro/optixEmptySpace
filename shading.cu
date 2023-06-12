@@ -104,23 +104,13 @@ extern "C" __global__ void __closesthit__mesh()
   
 }
 
-// extern "C" __global__ void __closesthit__mesh2() //handle primary rays
-// {
-
-//     float tmax = optixGetRayTmax();
-//     optixSetPayload_0( float_as_int(tmax) );
-
-// }
 
 extern "C" __global__ void __closesthit__mesh2() //handle primary rays
 {
+    float tmax = optixGetRayTmin();
 
-    float3  payload = getPayload();
-    const int primID = optixGetPrimitiveIndex();
+    setPayload(make_float3(tmax, 0.5f, 0.f));
 
-    if(optixIsTriangleBackFaceHit() ==true)
-        {  setPayload( payload + make_float3( 0.0f, 0.1f, 0.f));}
-        else{return;}
 }
 
 
