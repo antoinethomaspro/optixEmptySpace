@@ -54,11 +54,63 @@
 #include "optixWhitted.h"
 #include "CUDABuffer.h"
 
- 
+struct TriangleMesh {
+    void addCube(const float3 min, const float3 max);
+    std::vector<float3> vertex;
+    std::vector<int3> index;
+};
+
+void TriangleMesh::addCube(const float3 min, const float3 max) {
+    int baseIndex = static_cast<int>(vertex.size());
+
+    float3 v0 = make_float3(min.x, min.y, min.z);
+    float3 v1 = make_float3(max.x, min.y, min.z);
+    float3 v2 = make_float3(min.x, max.y, min.z);
+    float3 v3 = make_float3(max.x, max.y, min.z);
+    float3 v4 = make_float3(max.x, min.y, max.z);
+    float3 v5 = make_float3(max.x, max.y, max.z);
+    float3 v6 = make_float3(min.x, min.y, max.z);
+    float3 v7 = make_float3(min.x, max.y, max.z);
+
+    // Front face
+    index.push_back(make_int3(baseIndex + 0, baseIndex + 1, baseIndex + 2));
+    index.push_back(make_int3(baseIndex + 2, baseIndex + 1, baseIndex + 3));
+
+    // right face
+    index.push_back(make_int3(baseIndex + 1, baseIndex + 4, baseIndex + 3));
+    index.push_back(make_int3(baseIndex + 3, baseIndex + 4, baseIndex + 5));
+
+    // back face
+    index.push_back(make_int3(baseIndex + 4, baseIndex + 6, baseIndex + 5));
+    index.push_back(make_int3(baseIndex + 5, baseIndex + 6, baseIndex + 7));
+
+    // left face
+    index.push_back(make_int3(baseIndex + 7, baseIndex + 6, baseIndex + 0));
+    index.push_back(make_int3(baseIndex + 2, baseIndex + 7, baseIndex + 0));
+
+    // Bottom face
+    index.push_back(make_int3(baseIndex + 0, baseIndex + 4, baseIndex + 1));
+    index.push_back(make_int3(baseIndex + 0, baseIndex + 6, baseIndex + 4));
+
+    // Bottom face
+    index.push_back(make_int3(baseIndex + 3, baseIndex + 7, baseIndex + 2));
+    index.push_back(make_int3(baseIndex + 3, baseIndex + 5, baseIndex + 7));
+
+    vertex.push_back(v0);
+    vertex.push_back(v1);
+    vertex.push_back(v2);
+    vertex.push_back(v3);
+    vertex.push_back(v4);
+    vertex.push_back(v5);
+    vertex.push_back(v6);
+    vertex.push_back(v7);
+
+}
+
 
 
 struct Element {
-    std::vector<Triangle> triangles;
+    std::vector<int3> triangles;
     int elemID;
 
     // Function to fill the triangles based on input indices
@@ -70,20 +122,20 @@ struct Element {
         }
 
         // Create the four triangles based on the indices
-        Triangle triangle1;
-        triangle1.index = { indices[0], indices[1], indices[2] };
+        int3 triangle1;
+        triangle1 = { indices[0], indices[2], indices[1] };
         triangles.push_back(triangle1);
 
-        Triangle triangle2;
-        triangle2.index = { indices[0], indices[3], indices[1] };
+        int3 triangle2;
+        triangle2 = { indices[0], indices[1], indices[3] };
         triangles.push_back(triangle2);
 
-        Triangle triangle3;
-        triangle3.index = { indices[1], indices[3], indices[2] };
+        int3 triangle3;
+        triangle3 = { indices[1], indices[2], indices[3] };
         triangles.push_back(triangle3);
 
-        Triangle triangle4;
-        triangle4.index = { indices[2], indices[3], indices[0] };
+        int3 triangle4;
+        triangle4 = { indices[2], indices[0], indices[3] };
         triangles.push_back(triangle4);
     }
 };
@@ -100,18 +152,27 @@ bool areTrianglesEqual(const int3& triangle1, const int3& triangle2) {
 
 void fillFaceBuffer(const std::vector<Element>& elements, std::vector<Face>& faceBuffer) {
     for (const Element& element : elements) {
-        for (const Triangle& triangle : element.triangles) {
+        for (const int3& index : element.triangles) {
             bool found = false;
             for (Face& face : faceBuffer) {
-                if (areTrianglesEqual(triangle.index, face.index)) {
-                    face.elemIDs.y = element.elemID;
+                if (areTrianglesEqual(index, face.index)) {
+                    if (face.elemIDs.y == -1) {
+                        face.elemIDs.y = element.elemID;
+                    } else {
+                        // Duplicate triangle found, create a new face entry
+                        Face newFace;
+                        newFace.index = index;
+                        newFace.elemIDs.x = element.elemID;
+                        newFace.elemIDs.y = -1;
+                        faceBuffer.push_back(newFace);
+                    }
                     found = true;
                     break;
                 }
             }
             if (!found) {
                 Face newFace;
-                newFace.index = triangle.index;
+                newFace.index = index;
                 newFace.elemIDs.x = element.elemID;
                 newFace.elemIDs.y = -1;
                 faceBuffer.push_back(newFace);
@@ -180,6 +241,8 @@ struct WhittedState
     OptixProgramGroup           occlusion_miss_prog_group = 0;
     OptixProgramGroup           sphere_hit_prog_group  = 0;
     OptixProgramGroup           mesh_hit_prog_group = 0;
+    OptixProgramGroup           mesh_hit_prog_group2 = 0;
+
 
     OptixPipeline               pipeline                  = 0;
     OptixPipelineCompileOptions pipeline_compile_options  = {};
@@ -345,39 +408,12 @@ static void sphere_bound(float3 center, float radius, float result[6])
 
 
 static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle, std::vector<Face> &faceBuffer )
-{
+{   
     Element element0;
     element0.fillTriangles({ 0, 1, 2, 3 });
     element0.elemID = 0;
 
-    Element element1;
-    element1.fillTriangles({ 0, 1, 6, 2 });
-    element1.elemID = 1;
-
-    Element element2;
-    element2.fillTriangles({ 0, 3, 2, 5 });
-    element2.elemID = 2;
-
-    Element element3;
-    element3.fillTriangles({ 0, 1, 3, 4 });
-    element3.elemID = 3;
-
-    Element element4;
-    element4.fillTriangles({ 3, 1, 2, 7 });
-    element4.elemID = 4;
-
-
-    // Call the fillFaceBuffer function  !!!! HERRE ADD ELEMENTS !!!
-    fillFaceBuffer({element0, element1}, faceBuffer); 
-
-    std::vector<int3> ind;
-    for (const auto& face : faceBuffer) {
-        ind.push_back(face.index);
-    }
-
-
-   
-     std::vector<float3> arr = {{    //on traitera ça à la fin
+    std::vector<float3> arr = {{    //on traitera ça à la fin
     { 0.f, 0.f, 0.0f },
     { 5.f, 0.f, 0.0f},
     { 0.0f, 5.f, 0.f},
@@ -389,55 +425,88 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
         }};
 
 
-    CUDABuffer vertexBuffer;
-    CUDABuffer indexBuffer;
+    TriangleMesh model1;
+    model1.index = element0.triangles;
+    model1.vertex = arr;
+
+    fillFaceBuffer({element0}, faceBuffer); 
+
+    /*! the model we are going to trace rays against */
+    std::vector<TriangleMesh> meshes;
+    /*! one buffer per input mesh */
+    std::vector<CUDABuffer> vertexBuffer;
+    /*! one buffer per input mesh */
+    std::vector<CUDABuffer> indexBuffer;
+    //! buffer that keeps the (final, compacted) accel structure
+    //CUDABuffer asBuffer;
 
 
+    // TriangleMesh model1;
+    // model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
 
+    TriangleMesh model2;
+    model2.addCube(make_float3(0.f, 0.f, 6.f), make_float3(6.f, 6.f, 0.f));
 
-    vertexBuffer.alloc_and_upload(arr);
-    indexBuffer.alloc_and_upload(ind);
-
+    meshes.push_back(model1);
+   // meshes.push_back(model2);
 
     
+    vertexBuffer.resize(meshes.size());
+    indexBuffer.resize(meshes.size());
 
-     // ==================================================================
+
+
+
+    // ==================================================================
     // triangle inputs
     // ==================================================================
-    OptixBuildInput triangleInput = {};
-    triangleInput.type
+    
+    std::vector<OptixBuildInput> triangleInput(meshes.size());
+    std::vector<CUdeviceptr> d_vertices(meshes.size());
+	std::vector<CUdeviceptr> d_indices(meshes.size());
+	std::vector<uint32_t> triangleInputFlags(meshes.size());
+
+    for (int meshID=0;meshID<meshes.size();meshID++) {
+    // upload the model to the device: the builder
+    TriangleMesh &model = meshes[meshID];
+    vertexBuffer[meshID].alloc_and_upload(model.vertex);
+    indexBuffer[meshID].alloc_and_upload(model.index);
+
+    triangleInput[meshID] = {};
+    triangleInput[meshID].type
       = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
     // create local variables, because we need a *pointer* to the
     // device pointers
-    CUdeviceptr d_vertices = vertexBuffer.d_pointer();
-    CUdeviceptr d_indices  = indexBuffer.d_pointer();
+    d_vertices[meshID] = vertexBuffer[meshID].d_pointer();
+    d_indices[meshID]  = indexBuffer[meshID].d_pointer();
       
-    triangleInput.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
-    triangleInput.triangleArray.vertexStrideInBytes = sizeof(float3);
-    triangleInput.triangleArray.numVertices         = (int)arr.size();
-    triangleInput.triangleArray.vertexBuffers       = &d_vertices;
+    triangleInput[meshID].triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
+    triangleInput[meshID].triangleArray.vertexStrideInBytes = sizeof(float3);
+    triangleInput[meshID].triangleArray.numVertices         = (int)model.vertex.size();
+    triangleInput[meshID].triangleArray.vertexBuffers       = &d_vertices[meshID];
     
-    triangleInput.triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-    triangleInput.triangleArray.indexStrideInBytes  = sizeof(int3);
-    triangleInput.triangleArray.numIndexTriplets    = (int)ind.size();
-    triangleInput.triangleArray.indexBuffer         = d_indices;
+    triangleInput[meshID].triangleArray.indexFormat         = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+    triangleInput[meshID].triangleArray.indexStrideInBytes  = sizeof(int3);
+    triangleInput[meshID].triangleArray.numIndexTriplets    = (int)model.index.size();
+    triangleInput[meshID].triangleArray.indexBuffer         = d_indices[meshID];
     
-    uint32_t triangleInputFlags[1] = { 0 };
+    triangleInputFlags[meshID] = 0 ;
     
     // in this example we have one SBT entry, and no per-primitive
     // materials:
-    triangleInput.triangleArray.flags               = triangleInputFlags;
-    triangleInput.triangleArray.numSbtRecords               = 1;
-    triangleInput.triangleArray.sbtIndexOffsetBuffer        = 0; 
-    triangleInput.triangleArray.sbtIndexOffsetSizeInBytes   = 0; 
-    triangleInput.triangleArray.sbtIndexOffsetStrideInBytes = 0; 
+    triangleInput[meshID].triangleArray.flags               = &triangleInputFlags[meshID];
+    triangleInput[meshID].triangleArray.numSbtRecords               = 1;
+    triangleInput[meshID].triangleArray.sbtIndexOffsetBuffer        = 0; 
+    triangleInput[meshID].triangleArray.sbtIndexOffsetSizeInBytes   = 0; 
+    triangleInput[meshID].triangleArray.sbtIndexOffsetStrideInBytes = 0; 
+    }
       
     // ==================================================================
     // BLAS setup
     // ==================================================================
     
-    OptixAccelBuildOptions accelOptions = {};
+   OptixAccelBuildOptions accelOptions = {};
     accelOptions.buildFlags             = OPTIX_BUILD_FLAG_NONE
       | OPTIX_BUILD_FLAG_ALLOW_COMPACTION
       ;
@@ -448,8 +517,8 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     OPTIX_CHECK(optixAccelComputeMemoryUsage
                 (state.context,
                  &accelOptions,
-                 &triangleInput,
-                 1,  // num_build_inputs
+                 triangleInput.data(),
+                 (int)meshes.size(),  // num_build_inputs
                  &blasBufferSizes
                  ));
 
@@ -477,8 +546,8 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     OPTIX_CHECK(optixAccelBuild(state.context,
                                 /* stream */0,
                                 &accelOptions,
-                                &triangleInput,
-                                1,  
+                                triangleInput.data(),
+                                (int)meshes.size(),
                                 tempBuffer.d_pointer(),
                                 tempBuffer.sizeInBytes,
                                 
@@ -490,94 +559,6 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
                                 &emitDesc,1
                                 ));
     CUDA_SYNC_CHECK();
-
-}
-
-static void buildMesh( const WhittedState &state,
-   
-    OptixTraversableHandle &gas_handle,
-    CUdeviceptr &d_gas_output_buffer)
-    
-{
-    // Use default options for simplicity.  In a real use case we would want to
-    // enable compaction, etc
-    OptixAccelBuildOptions accel_options = {};
-    accel_options.buildFlags = OPTIX_BUILD_FLAG_NONE;
-    accel_options.operation  = OPTIX_BUILD_OPERATION_BUILD;
-
-    OptixBuildInput triangle_input = {};
-
-
-
-    const std::array<float3, 3> vertices =
-    { {
-            { -2.5f, -2.5f, 2.0f },
-            {  3.5f, -3.5f, 3.0f },
-            {  4.0f,  4.5f, 4.0f }
-    } };
-
-  
-
-    const size_t vertices_size = sizeof( float3 )*vertices.size();
-    CUdeviceptr d_vertices=0;
-    CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &d_vertices ), vertices_size ) );
-    CUDA_CHECK( cudaMemcpy(
-                reinterpret_cast<void*>( d_vertices ),
-                vertices.data(),
-                vertices_size,
-                cudaMemcpyHostToDevice
-                ) );
-
-    
-
-    // Our build input is a simple list of non-indexed triangle vertices
-    const uint32_t triangle_input_flags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
-    triangle_input.type                        = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
-    triangle_input.triangleArray.vertexFormat  = OPTIX_VERTEX_FORMAT_FLOAT3;
-    triangle_input.triangleArray.numVertices   = static_cast<uint32_t>( vertices.size() );
-    triangle_input.triangleArray.vertexBuffers = &d_vertices;
-    triangle_input.triangleArray.flags         = triangle_input_flags;
-    triangle_input.triangleArray.numSbtRecords = 1;
-
-    OptixAccelBufferSizes gas_buffer_sizes;
-    OPTIX_CHECK( optixAccelComputeMemoryUsage(
-                state.context,
-                &accel_options,
-                &triangle_input, //build inputs
-                1, // Number of build inputs
-                &gas_buffer_sizes
-                ) );
-    CUdeviceptr d_temp_buffer_gas;
-    CUDA_CHECK( cudaMalloc(
-                reinterpret_cast<void**>( &d_temp_buffer_gas ),
-                gas_buffer_sizes.tempSizeInBytes
-                ) );
-    CUDA_CHECK( cudaMalloc(
-                reinterpret_cast<void**>( &d_gas_output_buffer ),
-                gas_buffer_sizes.outputSizeInBytes
-                ) );
-                
-
-    OPTIX_CHECK( optixAccelBuild(
-                state.context,
-                0,                  // CUDA stream
-                &accel_options,
-                &triangle_input,
-                1,                  // num build inputs
-                d_temp_buffer_gas,
-                gas_buffer_sizes.tempSizeInBytes,
-                d_gas_output_buffer,
-                gas_buffer_sizes.outputSizeInBytes,
-                &gas_handle,
-                nullptr,            // emitted property list
-                0                   // num emitted properties
-                ) );
-
-    // We can now free the scratch space buffer used during build and the vertex
-    // inputs, since they are not needed by our trivial shading method
-    CUDA_CHECK( cudaFree( reinterpret_cast<void*>( d_temp_buffer_gas ) ) );
-    CUDA_CHECK( cudaFree( reinterpret_cast<void*>( d_vertices        ) ) );
-
 
 }
 
@@ -705,6 +686,34 @@ static void createMeshProgram( WhittedState &state, std::vector<OptixProgramGrou
     state.mesh_hit_prog_group = mesh_hit_prog_group;  
 }
 
+static void createMeshProgram2( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
+{
+    OptixProgramGroup           mesh_hit_prog_group2;
+    OptixProgramGroupOptions    mesh_hit_prog_group_options2 = {};
+    OptixProgramGroupDesc       mesh_hit_prog_group_desc2 = {};
+    mesh_hit_prog_group_desc2.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
+    mesh_hit_prog_group_desc2.hitgroup.moduleCH               = state.shading_module;
+    mesh_hit_prog_group_desc2.hitgroup.entryFunctionNameCH    = "__closesthit__mesh2";
+    mesh_hit_prog_group_desc2.hitgroup.moduleIS               = nullptr;
+    mesh_hit_prog_group_desc2.hitgroup.entryFunctionNameIS    = nullptr;
+    mesh_hit_prog_group_desc2.hitgroup.moduleAH               = nullptr;
+    mesh_hit_prog_group_desc2.hitgroup.entryFunctionNameAH    = nullptr;
+
+     char    log[2048];
+    size_t  sizeof_log = sizeof( log );
+    OPTIX_CHECK_LOG( optixProgramGroupCreate(
+        state.context,
+        &mesh_hit_prog_group_desc2,
+        1,
+        &mesh_hit_prog_group_options2,
+        log,
+        &sizeof_log,
+        &mesh_hit_prog_group2 ) );
+
+    program_groups.push_back(mesh_hit_prog_group2);
+    state.mesh_hit_prog_group2 = mesh_hit_prog_group2;  
+}
+
 
 static void createMissProgram( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
 {
@@ -760,7 +769,7 @@ void createPipeline( WhittedState &state )
     createModules( state );
     createCameraProgram( state, program_groups );
     createMeshProgram( state, program_groups );
-   // createMetalSphereProgram( state, program_groups );
+    createMeshProgram2( state, program_groups );
     createMissProgram( state, program_groups );
 
     // Link program groups to pipeline
@@ -857,57 +866,29 @@ void createSBT( WhittedState &state , const std::vector<Face> &faces )
 
      
     {
-        // Element element0;
-        // element0.fillTriangles({ 0, 1, 2, 3 });
-        // element0.elemID = 0;
-
-        // // Create an empty vector to store the faces
-        // std::vector<Face> faces;
-
-        // // Call the fillFaceBuffer function
-        // fillFaceBuffer({element0}, faces);
-
-        // Face face1;
-        // face1.elemIDs.x = 0;
-        // face1.elemIDs.y = 4;
-        // Face face2;
-        // face2.elemIDs.x = 1;
-        // face2.elemIDs.y = 4;
-        // Face face3;
-        // face3.elemIDs.x = 2;
-        // face3.elemIDs.y = 4;
-        // Face face4;
-        // face4.elemIDs.x = 3;
-        // face4.elemIDs.y = 4;
-
-        // std::vector<Face> faces;
-        // faces.push_back(face1);
-        // faces.push_back(face2);
-        // faces.push_back(face3);
-        // faces.push_back(face4); 
-        
-        
+       
         CUDABuffer faceBuffer;
         faceBuffer.alloc_and_upload(faces);
 
 
-        CUdeviceptr hitgroup_record;
-        size_t      hitgroup_record_size = sizeof( HitGroupSbtRecord );
-        CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &hitgroup_record ), hitgroup_record_size ) );
+        CUDABuffer hitgroupRecordsBuffer;
 
-        HitGroupSbtRecord hg_sbt;
-        hg_sbt.data.face = (Face*)faceBuffer.d_pointer();
-        OPTIX_CHECK( optixSbtRecordPackHeader( state.mesh_hit_prog_group, &hg_sbt ) );
-        CUDA_CHECK( cudaMemcpy(
-                    reinterpret_cast<void*>( hitgroup_record ),
-                    &hg_sbt,
-                    hitgroup_record_size,
-                    cudaMemcpyHostToDevice
-                    ) );
+        std::vector<HitGroupSbtRecord> hitgroupRecords;
 
-        state.sbt.hitgroupRecordBase            = hitgroup_record;  //ok
-        state.sbt.hitgroupRecordStrideInBytes   = sizeof( HitGroupSbtRecord );
-        state.sbt.hitgroupRecordCount           = 1;
+        HitGroupSbtRecord rec1;
+        rec1.data.face = (Face*)faceBuffer.d_pointer();
+        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group2, &rec1));
+        hitgroupRecords.push_back(rec1);
+
+        // HitGroupSbtRecord rec2;
+        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group2, &rec2));
+        // hitgroupRecords.push_back(rec2);
+
+        hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
+
+        state.sbt.hitgroupRecordBase          = hitgroupRecordsBuffer.d_pointer();
+        state.sbt.hitgroupRecordStrideInBytes = sizeof(HitGroupSbtRecord);
+        state.sbt.hitgroupRecordCount         = (int)hitgroupRecords.size();
 
     }
     

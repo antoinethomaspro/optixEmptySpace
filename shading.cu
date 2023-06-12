@@ -104,3 +104,39 @@ extern "C" __global__ void __closesthit__mesh()
      }
 
 }
+
+extern "C" __global__ void __closesthit__mesh2()
+{   
+    float3  payload = getPayload();
+
+    const int primID = optixGetPrimitiveIndex();
+
+    const HitGroupData* hit_group_data = reinterpret_cast<HitGroupData*>( optixGetSbtDataPointer() );
+
+    const Face face = hit_group_data->face[primID];
+
+    int2 elemIDs = face.elemIDs;
+
+    int elemID = optixIsTriangleBackFaceHit() ? elemIDs.x : elemIDs.y;
+    if (elemID < 0) return;
+    
+
+     switch(elemID){
+        case 0:
+            setPayload( payload + make_float3( 0.1f, 0.f, 0.f));
+            break;
+        case 1:
+            setPayload( payload + make_float3( 0.f, 1.f, 0.f));
+            break;
+        case 2:
+            setPayload( payload + make_float3( 0.f, 0.f, 1.f));
+            break;
+        case 3:
+            setPayload( payload + make_float3( 1.f, 1.f, 0.f));
+            break;
+        case 4:
+            setPayload( payload + make_float3( 0.f, 1.f, 1.f));
+            break;
+     }
+
+}
