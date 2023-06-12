@@ -94,6 +94,8 @@ struct Params
     unsigned int width;
     unsigned int height;
 
+    float color;
+
     BasicLight   light;                 // TODO: make light list
     float3       ambient_light_color;
     int          max_depth;

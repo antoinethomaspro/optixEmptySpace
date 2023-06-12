@@ -74,7 +74,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
         ray_origin,
         ray_direction,
         0.,
-        1e16f,
+        20.f,
         0.0f,
         OptixVisibilityMask( 1 ),
         OPTIX_RAY_FLAG_NONE,
@@ -90,14 +90,18 @@ extern "C" __global__ void __raygen__pinhole_camera()
     float res = payload_rgb.x ;
     float color = payload_rgb.y ;
 
-    if (params.subframe_index == 0 &&
-        optixGetLaunchIndex().x == 0 &&
-        optixGetLaunchIndex().y == 0) {
-      printf("############################################\n");
-      printf("Hello world from OptiX 7 raygen program!\n(this is your res: %i !!!)\n",
-             res);
-      printf("############################################\n");
-    }
+    int colorb = float_as_int(color);
+
+    
+
+    // if (params.subframe_index == 0 &&
+    //     optixGetLaunchIndex().x == 0 &&
+    //     optixGetLaunchIndex().y == 0) {
+    //   printf("############################################\n");
+    //   printf("Hello world from OptiX 7 raygen program!\n(this is your res: %i !!!)\n",
+    //          params.color);
+    //   printf("############################################\n");
+    // }
 
 
     float3 finalColor = make_float3(color, 0.f, 0.f) ;
