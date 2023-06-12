@@ -67,7 +67,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
     //OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 
     
-    for (float i = 0.f; i < 20.f; i+=0.05f ) {
+    for (float i = 0.f; i < 10.f; i+=0.1f ) {
 
     float3 origin = ray_origin + ray_direction*i;
 
@@ -82,14 +82,41 @@ extern "C" __global__ void __raygen__pinhole_camera()
         OPTIX_RAY_FLAG_NONE,
        // OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
        // OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
-        1,
-        RAY_TYPE_COUNT,
-        RAY_TYPE_RADIANCE,
+        1,                          // SBT offset
+        RAY_TYPE_COUNT,             // SBT stride
+        RAY_TYPE_RADIANCE,          // missSBTIndex 
         float3_as_args(payload_rgb));
 
     }
 
-    params.frame_buffer[image_index] = make_color( payload_rgb );
+    float3 res = payload_rgb ;
+
+    // for (float i = 0.f; i < 10.f; i+=0.1f ) {
+
+    // float3 origin = ray_origin + ray_direction*i;
+
+    // optixTrace(
+    //     params.handle2,
+    //     origin,
+    //     ray_direction,
+    //     0.,
+    //     1e16f,
+    //     0.0f,
+    //     OptixVisibilityMask( 1 ),
+    //     OPTIX_RAY_FLAG_NONE,
+    //    // OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+    //    // OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
+    //     0,                          // SBT offset                      
+    //     RAY_TYPE_COUNT,             // SBT stride             
+    //     RAY_TYPE_RADIANCE,          // missSBTIndex
+    //     float3_as_args(payload_rgb));
+
+    // }
+
+    //float3 res2 = payload_rgb ;
+
+    params.frame_buffer[image_index] = make_color( res );
+
 }
 
 
