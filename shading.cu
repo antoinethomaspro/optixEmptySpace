@@ -93,13 +93,7 @@ extern "C" __global__ void __miss__constant_bg()
 extern "C" __global__ void __closesthit__mesh()
 {
     const int primID = optixGetPrimitiveIndex();
-    // //  const HitGroupData &sbtData = *(const HitGroupData*)optixGetSbtDataPointer();
-    //  const HitGroupData* hit_group_data = reinterpret_cast<HitGroupData*>( optixGetSbtDataPointer() );
-
-    // const Face face1 = hit_group_data->face[primID];
-
-    // int2 elemIDs = face1.elemIDs;
-    //  int elemID = optixIsTriangleBackFaceHit() ? elemIDs.x : elemIDs.y;
+ 
     
     if (optixIsTriangleFrontFaceHit() == true)
         {
@@ -109,49 +103,12 @@ extern "C" __global__ void __closesthit__mesh()
         return setPayload(  make_float3( 1.0f, 0.f, 1.f));
     }
         }
-  
-    
-    
 
-    // switch(primID){
-    //     case 0:
-    //         setPayload(  make_float3( 0.0f, 0.f, 0.f));
-    //         break;
-    //     case 1:
-    //         setPayload(  make_float3( 0.0f, 1.f, 0.f));
-    //         break;
-    //     case 2:
-    //         setPayload(  make_float3( 0.f, 0.0f, 1.f));
-    //         break;
-    //     case 3:
-    //         setPayload(  make_float3( 1.0f, 1.f, 0.f));
-    //         break;
-    //     case 4:
-    //         setPayload(  make_float3( 1.0f, 0.f, 1.f));
-    //         break;
-    //     case 5:
-    //         setPayload(  make_float3( 0.f, 1.0f, 1.f));
-    //         break;
-    //     case 6:
-    //         setPayload(  make_float3( 1.0f, 1.f, 1.f));
-    //         break;
-    //     case 7:
-    //         setPayload(  make_float3( 255.f, 25.f, 0.f));
-    //         break;
-    //     case 8:
-    //         setPayload(  make_float3( 25.f, 25.0f, 0.f));
-    //         break;
-    //     case 9:
-    //         setPayload(  make_float3( 36.0f, 0.f, 80.f));
-    //         break;
-    //     case 10:
-    //         setPayload(  make_float3( 0.0f, 8.f, 16.f));
-    //         break;
-    //     case 11:
-    //         setPayload(  make_float3( 85.f, 26.0f, 128.f));
-    //         break;
-        
-    
-    
   
+}
+
+extern "C" __global__ void __closesthit__mesh2()
+{
+   
+  setPayload(  make_float3( 1.0f, 0.f, 1.f));
 }

@@ -251,6 +251,7 @@ struct WhittedState
     OptixProgramGroup           occlusion_miss_prog_group = 0;
     OptixProgramGroup           sphere_hit_prog_group  = 0;
     OptixProgramGroup           mesh_hit_prog_group = 0;
+    OptixProgramGroup           mesh_hit_prog_group2 = 0;
 
     OptixPipeline               pipeline                  = 0;
     OptixPipelineCompileOptions pipeline_compile_options  = {};
@@ -437,7 +438,7 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     // model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
 
     TriangleMesh model2;
-    model2.addCube(make_float3(-2.f, 2.f, 2.f), make_float3(0.f, 4.f, 0.f));
+    model2.addCube(make_float3(0.f, 0.f, 6.f), make_float3(6.f, 6.f, 0.f));
 
     
 
@@ -652,6 +653,34 @@ static void createMeshProgram( WhittedState &state, std::vector<OptixProgramGrou
     state.mesh_hit_prog_group = mesh_hit_prog_group;  
 }
 
+static void createMeshProgram2( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
+{
+    OptixProgramGroup           mesh_hit_prog_group2;
+    OptixProgramGroupOptions    mesh_hit_prog_group_options2 = {};
+    OptixProgramGroupDesc       mesh_hit_prog_group_desc2 = {};
+    mesh_hit_prog_group_desc2.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
+    mesh_hit_prog_group_desc2.hitgroup.moduleCH               = state.shading_module;
+    mesh_hit_prog_group_desc2.hitgroup.entryFunctionNameCH    = "__closesthit__mesh2";
+    mesh_hit_prog_group_desc2.hitgroup.moduleIS               = nullptr;
+    mesh_hit_prog_group_desc2.hitgroup.entryFunctionNameIS    = nullptr;
+    mesh_hit_prog_group_desc2.hitgroup.moduleAH               = nullptr;
+    mesh_hit_prog_group_desc2.hitgroup.entryFunctionNameAH    = nullptr;
+
+     char    log[2048];
+    size_t  sizeof_log = sizeof( log );
+    OPTIX_CHECK_LOG( optixProgramGroupCreate(
+        state.context,
+        &mesh_hit_prog_group_desc2,
+        1,
+        &mesh_hit_prog_group_options2,
+        log,
+        &sizeof_log,
+        &mesh_hit_prog_group2 ) );
+
+    program_groups.push_back(mesh_hit_prog_group2);
+    state.mesh_hit_prog_group2 = mesh_hit_prog_group2;  
+}
+
 
 static void createMissProgram( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
 {
@@ -707,7 +736,8 @@ void createPipeline( WhittedState &state )
     createModules( state );
     createCameraProgram( state, program_groups );
     createMeshProgram( state, program_groups );
-   // createMetalSphereProgram( state, program_groups );
+    createMeshProgram2( state, program_groups );
+   
     createMissProgram( state, program_groups );
 
     // Link program groups to pipeline
@@ -836,7 +866,7 @@ void createSBT( WhittedState &state , const std::vector<Face> &faces )
         hitgroupRecords.push_back(rec1);
 
         HitGroupSbtRecord rec2;
-        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec2));
+        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group2, &rec2));
         hitgroupRecords.push_back(rec2);
 
         hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
