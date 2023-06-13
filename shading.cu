@@ -40,33 +40,8 @@ __constant__ Params params;
 
 #define float3_as_ints( u ) float_as_int( u.x ), float_as_int( u.y ), float_as_int( u.z )
 
-extern "C" __global__ void __intersection__sphere()
-{
-    //const SphereHitGroupData* hit_group_data = reinterpret_cast<SphereHitGroupData*>( optixGetSbtDataPointer() );
 
 
-    optixReportIntersection(0., 0.);
-}
-
-static __device__ __inline__ RadiancePRD getRadiancePRD()
-{
-    RadiancePRD prd;
-    prd.result.x = int_as_float( optixGetPayload_0() );
-    prd.result.y = int_as_float( optixGetPayload_1() );
-    prd.result.z = int_as_float( optixGetPayload_2() );
-    prd.importance = int_as_float( optixGetPayload_3() );
-    prd.depth = optixGetPayload_4();
-    return prd;
-}
-
-static __device__ __inline__ void setRadiancePRD( const RadiancePRD &prd )
-{
-    optixSetPayload_0( float_as_int(prd.result.x) );
-    optixSetPayload_1( float_as_int(prd.result.y) );
-    optixSetPayload_2( float_as_int(prd.result.z) );
-    optixSetPayload_3( float_as_int(prd.importance) );
-    optixSetPayload_4( prd.depth );
-}
 
 static __forceinline__ __device__ void setPayload( float3 p )
 {
@@ -88,7 +63,7 @@ static __forceinline__ __device__ float3 getPayload()
 
 extern "C" __global__ void __miss__constant_bg()
 {
-   
+
 }
 
 extern "C" __global__ void __closesthit__mesh()
@@ -108,39 +83,7 @@ extern "C" __global__ void __closesthit__mesh()
 extern "C" __global__ void __closesthit__mesh2() //handle primary rays
 {
     float tmax = optixGetRayTmax ();
-
-    setPayload(make_float3(tmax, 0.f, 0.f));
-
+    
+        setPayload( make_float3( tmax, 0.f, 0.f));
+    
 }
-
-
-
-// extern "C" __global__ void __closesthit__mesh()
-// {
-//     const int primID = optixGetPrimitiveIndex();
- 
-    
-//     if (optixIsTriangleFrontFaceHit() == true)
-//         {
-//              if (primID % 2 == 0) {
-//         return setPayload(  make_float3( 0.0f, 0.f, 0.f));
-//     } else {
-//         return setPayload(  make_float3( 1.0f, 0.f, 1.f));
-//     }
-//         }
-// }
-
-// extern "C" __global__ void __closesthit__mesh2()
-// {
-//     const int primID = optixGetPrimitiveIndex();
- 
-    
-//     if (optixIsTriangleFrontFaceHit() == true)
-//         {
-//              if (primID % 2 == 0) {
-//         return setPayload(  make_float3( 1.0f, 0.f, 0.f));
-//     } else {
-//         return setPayload(  make_float3( 1.0f, 1.f, 1.f));
-//     }
-//         }
-// }

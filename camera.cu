@@ -52,21 +52,55 @@ extern "C" __global__ void __raygen__pinhole_camera()
     float3 ray_origin = camera->eye;
     float3 ray_direction = normalize(d.x*camera->U + d.y*camera->V + camera->W);
 
-
-    float3 payload_rgb = make_float3( 0.f, 0.f, 0.f);
-
-    //OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
-    //OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-    
-    for (float i = 0.f; i < 20.f; i+=0.05f ) {
-
-    float3 origin = ray_origin + ray_direction*i;
+    float3 payload_rgb = make_float3(1e17f, 0.f, 0.f);
 
     optixTrace(
         params.handle,                     // handle
-        origin,                         // float3 rayOrigin
+        ray_origin,                         // float3 rayOrigin
         ray_direction,                      // float3 rayDirection
-        0.,                                 // float tmin
+        0.f,                                 // float tmin
+        1e16f,                              // float tmax
+        0.0f,                               // float rayTime
+        OptixVisibilityMask( 1 ),
+        OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+        1,                          // SBT offset (1 = CH2)
+        RAY_TYPE_COUNT,             // SBT stride
+        RAY_TYPE_RADIANCE,          // missSBTIndex 
+        float3_as_args(payload_rgb));
+
+    float distanceMin = payload_rgb.x;
+    payload_rgb.x = 0.f;
+    
+
+
+    optixTrace(
+        params.handle,                     // handle
+        ray_origin,                         // float3 rayOrigin
+        ray_direction,                      // float3 rayDirection
+        0.f,                                 // float tmin
+        1e16f,                              // float tmax
+        0.0f,                               // float rayTime
+        OptixVisibilityMask( 1 ),
+        OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
+        1,                          // SBT offset (1 = CH2)
+        RAY_TYPE_COUNT,             // SBT stride
+        RAY_TYPE_RADIANCE,          // missSBTIndex 
+        float3_as_args(payload_rgb));
+
+    float distanceMax = payload_rgb.x;
+    payload_rgb.x = 0.f;
+
+    float3 position;
+
+    for (float t = distanceMin; t < distanceMax; t +=0.05f)
+    {
+        position = ray_origin + t * ray_direction;
+
+        optixTrace(
+        params.handle,                     // handle
+        position,                         // float3 rayOrigin
+        ray_direction,                      // float3 rayDirection
+        0.f,                                 // float tmin
         1e16f,                              // float tmax
         0.0f,                               // float rayTime
         OptixVisibilityMask( 1 ),
@@ -75,12 +109,11 @@ extern "C" __global__ void __raygen__pinhole_camera()
         RAY_TYPE_COUNT,             // SBT stride
         RAY_TYPE_RADIANCE,          // missSBTIndex 
         float3_as_args(payload_rgb));
+
     }
 
-
-
+    
     params.frame_buffer[image_index] = make_color( payload_rgb );
+  
+
 }
-
-
-
