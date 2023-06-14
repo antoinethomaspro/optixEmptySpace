@@ -52,8 +52,11 @@ extern "C" __global__ void __raygen__pinhole_camera()
     float3 ray_origin = camera->eye;
     float3 ray_direction = normalize(d.x*camera->U + d.y*camera->V + camera->W);
 
-    float3 payload_rgb = make_float3(1e17f, 0.f, 0.f);
+    float distanceMin = -1.0f; // Front face intersection distance, stays negative when missed.
+    float distanceMax = -1.0f; // Back  face intersection distance, stays negative when missed.
 
+  
+    unsigned int payload = __float_as_uint(distanceMin);
     optixTrace(
         params.handle,                     // handle
         ray_origin,                         // float3 rayOrigin
@@ -66,13 +69,13 @@ extern "C" __global__ void __raygen__pinhole_camera()
         1,                          // SBT offset (1 = CH2)
         RAY_TYPE_COUNT,             // SBT stride
         RAY_TYPE_RADIANCE,          // missSBTIndex 
-        float3_as_args(payload_rgb));
+        payload);
 
-    float distanceMin = payload_rgb.x;
-    payload_rgb.x = 0.f;
+
+    distanceMin = __uint_as_float(payload);
+
     
-
-
+    payload = __float_as_uint(distanceMax);
     optixTrace(
         params.handle,                     // handle
         ray_origin,                         // float3 rayOrigin
@@ -85,16 +88,47 @@ extern "C" __global__ void __raygen__pinhole_camera()
         1,                          // SBT offset (1 = CH2)
         RAY_TYPE_COUNT,             // SBT stride
         RAY_TYPE_RADIANCE,          // missSBTIndex 
-        float3_as_args(payload_rgb));
+        payload);
 
-    float distanceMax = payload_rgb.x;
-    payload_rgb.x = 0.f;
+    distanceMax = __uint_as_float(payload);
+
+
+
+     if (0.0f < distanceMin && 0.0f < distanceMax)
+        {
+            if (distanceMin < distanceMax)
+            {
+            // The standard case: The ray started outside a volume and hit a front face and a back face farther away.
+            // No special handling required. Use the two distance values as begin and end of the ray marching.
+            }
+            else // if distanceMin >= distanceMax
+            {
+            // This means a backface was hit before a father away front face.
+            // In that case the ray origin must be inside a volume.
+            distanceMax = distanceMin; // to be checked. 
+            distanceMin = 0.0f;
+            }
+        }
+        else 
+        {
+            // Both rays missed, nothing to do here, fill per output buffer with default default data and return.
+            params.frame_buffer[image_index] = make_color( make_float3(0.f) ); //why do I need this default outputbuffer???
+            return;
+        }
+
+    //      else // if (0.0f < distanceMin && distanceMax < 0.0f)
+    //         {
+    //             // Illegal case. Front face hit but back face missed
+    //             // This would mean there is no end to the volume and the ray marching would be until world end.
+    //             // Maybe tint the result in some debug color to see if this happens.
+    //             return;
+    //         }
 
     float3 position;
-
-    for (float t = distanceMin; t < distanceMax; t +=0.05f)
+    float3 payload_rgb = make_float3(0.f, 0.f, 0.f);
+    for (float distance = distanceMin; distance < distanceMax; distance += 0.5)
     {
-        position = ray_origin + t * ray_direction;
+        const float3 position = ray_origin + ray_direction * distance;
 
         optixTrace(
         params.handle,                     // handle
@@ -109,8 +143,8 @@ extern "C" __global__ void __raygen__pinhole_camera()
         RAY_TYPE_COUNT,             // SBT stride
         RAY_TYPE_RADIANCE,          // missSBTIndex 
         float3_as_args(payload_rgb));
-
     }
+
 
     
     params.frame_buffer[image_index] = make_color( payload_rgb );
