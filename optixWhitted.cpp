@@ -426,6 +426,18 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     element0.fillTriangles({ 0, 1, 2, 3 });
     element0.elemID = 0;
 
+    Element element1;
+    element1.fillTriangles({ 0, 1, 6, 2 });
+    element1.elemID = 1;
+
+    // Call the fillFaceBuffer function  !!!! HERRE ADD ELEMENTS !!!
+    fillFaceBuffer({element0}, faceBuffer);  //warning: add element1 here
+
+    std::vector<int3> ind;
+    for (const auto& face : faceBuffer) {
+        ind.push_back(face.index);
+    }
+
     std::vector<float3> arr = {{    //on traitera ça à la fin
     { 0.f, 0.f, 0.0f },
     { 5.f, 0.f, 0.0f},
@@ -437,9 +449,16 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     {5.f, 5.f, 5.f }
         }};
 
+
     TriangleMesh model1;
-    model1.index = element0.triangles;
+    model1.index = ind;
     model1.vertex = arr;
+
+    // TriangleMesh model1;
+    // model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
+
+    // TriangleMesh model2;
+    // model2.addCube(make_float3(-1.f, -1.f, 1.f), make_float3(3.f, 3.f, -3.f));
 
     meshes.push_back(model1);
 
@@ -568,10 +587,10 @@ static void buildBox(const WhittedState &state, OptixTraversableHandle &gas_hand
 
 
     TriangleMesh model1;
-    model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(5.f, 5.f, 5.f));
+    model1.addCube(make_float3(0.f, 0.f, 5.f), make_float3(5.f, 5.f, 0.f));
 
-    TriangleMesh model2;
-    model2.addCube(make_float3(0.f, 0.f, -4.f), make_float3(2.f, 2.f, -6.f));
+    // TriangleMesh model2;
+    // model2.addCube(make_float3(0.f, 0.f, -4.f), make_float3(2.f, 2.f, -6.f));
 
     meshes.push_back(model1);
     // meshes.push_back(model2);
@@ -965,34 +984,15 @@ void createSBT( WhittedState &state , const std::vector<Face> &faces )
 
      
     {
-        // CUDABuffer hitgroupRecordsBuffer;
+        CUDABuffer faceBuffer;
+        faceBuffer.alloc_and_upload(faces);
 
-        // std::vector<HitGroupSbtRecord> hitgroupRecords;
-
-        // HitGroupSbtRecord rec1;
-        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec1));
-        // hitgroupRecords.push_back(rec1);
-
-        // HitGroupSbtRecord rec2;
-        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec2));
-        // hitgroupRecords.push_back(rec2);
-
-        // hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
-
-        // state.sbt.hitgroupRecordBase          = hitgroupRecordsBuffer.d_pointer();
-        // state.sbt.hitgroupRecordStrideInBytes = sizeof(HitGroupSbtRecord);
-        // state.sbt.hitgroupRecordCount         = (int)hitgroupRecords.size();
-        
-        // CUDABuffer faceBuffer;
-        // faceBuffer.alloc_and_upload(faces);
-
-       ///  
-
-         CUDABuffer hitgroupRecordsBuffer;
+        CUDABuffer hitgroupRecordsBuffer;
 
         std::vector<HitGroupSbtRecord> hitgroupRecords;
 
         HitGroupSbtRecord rec1;
+        rec1.data.face = (Face*)faceBuffer.d_pointer();
         OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec1));
         hitgroupRecords.push_back(rec1);
 
