@@ -422,15 +422,26 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     //! buffer that keeps the (final, compacted) accel structure
     //CUDABuffer asBuffer;
 
+    Element element0;
+    element0.fillTriangles({ 0, 1, 2, 3 });
+    element0.elemID = 0;
+
+    std::vector<float3> arr = {{    //on traitera ça à la fin
+    { 0.f, 0.f, 0.0f },
+    { 5.f, 0.f, 0.0f},
+    { 0.0f, 5.f, 0.f},
+    { 0.0f, 0.f, 5.f},
+    {0.f, -5.f,  0.f},
+    {-5.f, 0.f, 0.f} ,
+    {0.f, 0.f, -5.f},
+    {5.f, 5.f, 5.f }
+        }};
 
     TriangleMesh model1;
-    model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
-
-    TriangleMesh model2;
-    model2.addCube(make_float3(-1.f, -1.f, 1.f), make_float3(3.f, 3.f, -3.f));
+    model1.index = element0.triangles;
+    model1.vertex = arr;
 
     meshes.push_back(model1);
-   // meshes.push_back(model2);
 
     
     vertexBuffer.resize(meshes.size());
@@ -557,13 +568,13 @@ static void buildBox(const WhittedState &state, OptixTraversableHandle &gas_hand
 
 
     TriangleMesh model1;
-    model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
+    model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(5.f, 5.f, 5.f));
 
     TriangleMesh model2;
-    model2.addCube(make_float3(-1.f, -1.f, 1.f), make_float3(3.f, 3.f, -3.f));
+    model2.addCube(make_float3(0.f, 0.f, -4.f), make_float3(2.f, 2.f, -6.f));
 
-    // meshes.push_back(model1);
-   meshes.push_back(model2);
+    meshes.push_back(model1);
+    // meshes.push_back(model2);
 
     
     vertexBuffer.resize(meshes.size());
