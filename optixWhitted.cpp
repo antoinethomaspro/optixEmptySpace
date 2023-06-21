@@ -427,11 +427,11 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     element0.elemID = 0;
 
     Element element1;
-    element1.fillTriangles({ 0, 1, 6, 2 });
+    element1.fillTriangles({ 4, 5, 7, 6 });
     element1.elemID = 1;
 
     // Call the fillFaceBuffer function  !!!! HERRE ADD ELEMENTS !!!
-    fillFaceBuffer({element0}, faceBuffer);  //warning: add element1 here
+    fillFaceBuffer({element0, element1}, faceBuffer);  //warning: add element1 here
 
     std::vector<int3> ind;
     for (const auto& face : faceBuffer) {
@@ -443,24 +443,21 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     { 5.f, 0.f, 0.0f},
     { 0.0f, 5.f, 0.f},
     { 0.0f, 0.f, 5.f},
-    {0.f, -5.f,  0.f},
-    {-5.f, 0.f, 0.f} ,
-    {0.f, 0.f, -5.f},
-    {5.f, 5.f, 5.f }
+    {0.f, 0.f,  -2.f},
+    {5.f, 0.f, -2.f} ,
+    {0.f, 5.f, -2.f},
+    {0.f, 0.f, -7.f }
         }};
+        
 
 
     TriangleMesh model1;
     model1.index = ind;
     model1.vertex = arr;
 
-    // TriangleMesh model1;
-    // model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
-
-    // TriangleMesh model2;
-    // model2.addCube(make_float3(-1.f, -1.f, 1.f), make_float3(3.f, 3.f, -3.f));
-
+  
     meshes.push_back(model1);
+
 
     
     vertexBuffer.resize(meshes.size());
@@ -587,7 +584,7 @@ static void buildBox(const WhittedState &state, OptixTraversableHandle &gas_hand
 
 
     TriangleMesh model1;
-    model1.addCube(make_float3(0.f, 0.f, 5.f), make_float3(5.f, 5.f, 0.f));
+    model1.addCube(make_float3(0.f, 0.f, 5.f), make_float3(5.f, 5.f, -5.f));
 
     // TriangleMesh model2;
     // model2.addCube(make_float3(0.f, 0.f, -4.f), make_float3(2.f, 2.f, -6.f));

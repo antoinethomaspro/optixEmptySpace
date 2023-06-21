@@ -87,10 +87,10 @@ extern "C" __global__ void __closesthit__mesh()
             setPayload( payload + make_float3( 0.1f, 0.f, 0.f));
             break;
         case 1:
-            setPayload( payload + make_float3( 0.f, 1.f, 0.f));
+            setPayload( payload + make_float3( 0.f, 0.1f, 0.f));
             break;
         case 2:
-            setPayload( payload + make_float3( 0.f, 0.f, 1.f));
+            setPayload( payload + make_float3( 0.f, 0.f, 0.1f));
             break;
         case 3:
             setPayload( payload + make_float3( 1.f, 1.f, 0.f));
@@ -104,7 +104,7 @@ extern "C" __global__ void __closesthit__mesh()
     // const int primID = optixGetPrimitiveIndex();
 
     // if(optixIsTriangleBackFaceHit() ==true)
-    //     {  setPayload( payload + make_float3( 0.f, 0.1f, 0.f));}
+    //     {  setPayload( payload + make_float3( 0.1f, 0.f, 0.f));}
     //     else{return;}
 
   
