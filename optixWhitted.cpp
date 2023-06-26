@@ -443,10 +443,10 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     { 5.f, 0.f, 0.0f},
     { 0.0f, 5.f, 0.f},
     { 0.0f, 0.f, 5.f},
-    {0.f, 0.f,  -2.f},
-    {5.f, 0.f, -2.f} ,
-    {0.f, 5.f, -2.f},
-    {0.f, 0.f, -7.f }
+    {0.f, 0.f,  -4.f},
+    {5.f, 0.f, -4.f} ,
+    {0.f, 5.f, -4.f},
+    {0.f, 0.f, -9.f }
         }};
         
 
@@ -587,10 +587,14 @@ static void buildBox(const WhittedState &state, OptixTraversableHandle &gas_hand
     model1.addCube(make_float3(0.f, 0.f, 5.f), make_float3(5.f, 5.f, 0.f));
 
     TriangleMesh model2;
-    model2.addCube(make_float3(0.f, 0.f, -2.f), make_float3(5.f, 5.f, -7.f));
+    model2.addCube(make_float3(0.f, 0.f, -4.f), make_float3(5.f, 5.f, -9.f));
 
-    meshes.push_back(model1);
-    // meshes.push_back(model2);
+    TriangleMesh model3; //big box
+    model3.addCube(make_float3(0.f, 0.f, 5.f), make_float3(5.f, 5.f, -7.f));
+
+   //meshes.push_back(model3);
+   meshes.push_back(model1);
+   meshes.push_back(model2);
 
     
     vertexBuffer.resize(meshes.size());
@@ -981,6 +985,20 @@ void createSBT( WhittedState &state , const std::vector<Face> &faces )
 
      
     {
+        std::vector<Face> faceTest(24);
+
+        // Filling the first 12 faces with elemIDs.x = 0 and y = -1
+        for (int i = 0; i < 12; i++) {
+            faceTest[i].elemIDs.x = 0;
+            faceTest[i].elemIDs.y = -1;
+        }
+
+        // Filling the next 12 faces with elemIDs.x = 1 and y = -1
+        for (int i = 12; i < 24; i++) {
+            faceTest[i].elemIDs.x = 1;
+            faceTest[i].elemIDs.y = -1;
+        }
+
         CUDABuffer faceBuffer;
         faceBuffer.alloc_and_upload(faces);
 
