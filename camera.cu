@@ -49,39 +49,94 @@ extern "C" __global__ void __raygen__pinhole_camera()
 
     // Subpixel jitter: send the ray through a different position inside the pixel each time,
     // to provide antialiasing. The center of each pixel is at fraction (0.5,0.5)
-    float2 subpixel_jitter = params.subframe_index == 0 ?
-        make_float2(0.5f, 0.5f) : make_float2(rnd( seed ), rnd( seed ));
+    float2 subpixel_jitter = make_float2(0.5f, 0.5f);
 
-    float2 d = ((make_float2(idx.x, idx.y) ) / make_float2(params.width, params.height)) * 2.f - 1.f;
+    float2 d = ((make_float2(idx.x, idx.y) + subpixel_jitter) / make_float2(params.width, params.height)) * 2.f - 1.f;
     float3 ray_origin = camera->eye;
     float3 ray_direction = normalize(d.x*camera->U + d.y*camera->V + camera->W);
 
-    float3 payload_rgb = make_float3( 0.f, 0.f, 0.f);
+    float3 payload_rgb;
+
+    float distance = -5.f;
+
+    int tost;
+
+    
+    
 
     //OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
     //OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-    //OPTIX_RAY_FLAG_NONE,
-    for (float i = 0.f; i < 20.f; i+=0.05f ) {
 
-    float3 origin = ray_origin + ray_direction*i;
+    unsigned int payloadDistance = __float_as_uint(distance);
+    unsigned int payloadTost = 0;
 
-    optixTrace(
-        params.handle,
-        origin,
-        ray_direction,
-        0.,
-        1e16f,
-        0.0f,
-        OptixVisibilityMask( 1 ),
-        OPTIX_RAY_FLAG_NONE,
-        0, // SBT offset
-        0, // SBT stride
-        0, // missSBTIndex
-        float3_as_args(payload_rgb));
+     optixTrace(
+                params.handle, // handle
+                ray_origin,           // float3 rayOrigin
+                ray_direction, // float3 rayDirection
+                0.f,           // float tmin
+                1e16f,         // float tmax
+                0.0f,          // float rayTime
+                OptixVisibilityMask(1),
+                OPTIX_RAY_FLAG_NONE,
+                0,                 // SBT offset (1 = CH2)
+                RAY_TYPE_COUNT,    // SBT stride
+                RAY_TYPE_RADIANCE, // missSBTIndex
+                float3_as_args(payload_rgb),
+                payloadTost,
+                payloadDistance
+                );
 
-    }
-   
-
-    params.frame_buffer[image_index] = make_color( payload_rgb );
     
+    distance = __uint_as_float(payloadDistance);
+
+    tost = payloadTost;
+
+    
+    params.frame_buffer[image_index] = make_color(payload_rgb);
+
+
+    float3 rgb_test = make_float3(0.f);
+
+    if (params.subframe_index == 0 &&
+        optixGetLaunchIndex().x == 0 &&
+        optixGetLaunchIndex().y == 0 &&
+        tost == 3) 
+    {
+      printf("I'm the thread which touched the MH shader!\n");
+  }
+    if (
+        optixGetLaunchIndex().x == 384 &&
+        optixGetLaunchIndex().y == 384 &&
+        tost == 9 &&
+        distance < 8.1f) 
+    {
+      printf("I'm the thread which touched the CH shader!\n");
+
+      for (int j = 0; j < 50; j++) {
+        for (int i = 0; i < 50; i++) {
+        params.frame_buffer[(768 * j) + i] = make_color(rgb_test);
+    }
+
+
+
+      
+    //   params.frame_buffer[image_index * (780 *3) + i] = make_color(rgb_test);
+    //   params.frame_buffer[image_index * (780 *4) + i] = make_color(rgb_test);
+    //   params.frame_buffer[image_index * (780 *5)+ i] = make_color(rgb_test);
+    //   params.frame_buffer[image_index * (780 *6)+ i] = make_color(rgb_test);
+    //   params.frame_buffer[image_index * (780 *7)+ i] = make_color(rgb_test);
+      
+      
+      
+      
+      }
+      
+
+
+  }
+
+    
+
+
 }

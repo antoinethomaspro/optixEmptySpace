@@ -26,6 +26,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+#include <cmath>
+
 #include <vector_types.h>
 #include <optix_device.h>
 
@@ -46,6 +48,26 @@ extern "C" __global__ void __intersection__sphere()
     optixReportIntersection(0., 0.);
 }
 
+static __device__ __inline__ RadiancePRD getRadiancePRD()
+{
+    RadiancePRD prd;
+    prd.result.x = int_as_float( optixGetPayload_0() );
+    prd.result.y = int_as_float( optixGetPayload_1() );
+    prd.result.z = int_as_float( optixGetPayload_2() );
+    prd.importance = int_as_float( optixGetPayload_3() );
+    prd.depth = optixGetPayload_4();
+    return prd;
+}
+
+static __device__ __inline__ void setRadiancePRD( const RadiancePRD &prd )
+{
+    optixSetPayload_0( float_as_int(prd.result.x) );
+    optixSetPayload_1( float_as_int(prd.result.y) );
+    optixSetPayload_2( float_as_int(prd.result.z) );
+    optixSetPayload_3( float_as_int(prd.importance) );
+    optixSetPayload_4( prd.depth );
+}
+
 static __forceinline__ __device__ void setPayload( float3 p )
 {
     optixSetPayload_0( float_as_int( p.x ) );
@@ -53,90 +75,42 @@ static __forceinline__ __device__ void setPayload( float3 p )
     optixSetPayload_2( float_as_int( p.z ) );
 }
 
-static __forceinline__ __device__ float3 getPayload()
-{
-    return make_float3(
-            int_as_float( optixGetPayload_0() ),
-            int_as_float( optixGetPayload_1() ),
-            int_as_float( optixGetPayload_2() )
-            );
-}
 
 
+// extern "C" __global__ void __closesthit__metal_radiance()
+// {
+//     setPayload( make_float3(1.f, 0.f, 0.f));
+// }
 
 extern "C" __global__ void __miss__constant_bg()
 {
-   
+    const MissData* sbt_data = (MissData*) optixGetSbtDataPointer();
+    RadiancePRD prd = getRadiancePRD();
+    prd.result = sbt_data->bg_color;
+    setRadiancePRD(prd);
+
+    int a = 3;
+    optixSetPayload_3(a);
 }
 
 extern "C" __global__ void __closesthit__mesh()
-{   
-    float3  payload = getPayload();
-
+{
     const int primID = optixGetPrimitiveIndex();
-
-    const HitGroupData* hit_group_data = reinterpret_cast<HitGroupData*>( optixGetSbtDataPointer() );
-
-    const Face face = hit_group_data->face[primID];
-
-    int2 elemIDs = face.elemIDs;
-
-    int elemID = optixIsTriangleBackFaceHit() ? elemIDs.x : elemIDs.y;
-    if (elemID < 0) return;
     
+    if (optixIsTriangleBackFaceHit() == false) {
+         setPayload(  make_float3( 1.0f, 0.f, 0.f));
+    }
+    else { setPayload(  make_float3( 0.f, 0.f, 0.f));}
 
-     switch(elemID){
-        case 0:
-            setPayload( payload + make_float3( 0.1f, 0.f, 0.f));
-            break;
-        case 1:
-            setPayload( payload + make_float3( 0.f, 1.f, 0.f));
-            break;
-        case 2:
-            setPayload( payload + make_float3( 0.f, 0.f, 1.f));
-            break;
-        case 3:
-            setPayload( payload + make_float3( 1.f, 1.f, 0.f));
-            break;
-        case 4:
-            setPayload( payload + make_float3( 0.f, 1.f, 1.f));
-            break;
-     }
+    int a = 9;
 
-}
+    float tmax; //le convertir en int directement? 
 
-extern "C" __global__ void __closesthit__mesh2()
-{   
-    float3  payload = getPayload();
+    tmax = optixGetRayTmax ();
 
-    const int primID = optixGetPrimitiveIndex();
+    optixSetPayload_3(a);
+    optixSetPayload_4( float_as_int( tmax ) );
 
-    const HitGroupData* hit_group_data = reinterpret_cast<HitGroupData*>( optixGetSbtDataPointer() );
-
-    const Face face = hit_group_data->face[primID];
-
-    int2 elemIDs = face.elemIDs;
-
-    int elemID = optixIsTriangleBackFaceHit() ? elemIDs.x : elemIDs.y;
-    if (elemID < 0) return;
-    
-
-     switch(elemID){
-        case 0:
-            setPayload( payload + make_float3( 0.1f, 0.f, 0.f));
-            break;
-        case 1:
-            setPayload( payload + make_float3( 0.f, 1.f, 0.f));
-            break;
-        case 2:
-            setPayload( payload + make_float3( 0.f, 0.f, 1.f));
-            break;
-        case 3:
-            setPayload( payload + make_float3( 1.f, 1.f, 0.f));
-            break;
-        case 4:
-            setPayload( payload + make_float3( 0.f, 1.f, 1.f));
-            break;
-     }
-
+        
+  
 }

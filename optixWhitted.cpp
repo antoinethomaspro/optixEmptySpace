@@ -107,10 +107,27 @@ void TriangleMesh::addCube(const float3 min, const float3 max) {
 
 }
 
+void displayTriangleMesh(const TriangleMesh& model) {
+    // Display vertex attributes
+    std::cout << "Vertex Attributes:" << std::endl;
+    for (const auto& vertex : model.vertex) {
+        std::cout << "x: " << vertex.x << ", y: " << vertex.y << ", z: " << vertex.z << std::endl;
+    }
+
+    // Display index attributes
+    std::cout << "Index Attributes:" << std::endl;
+    for (const auto& index : model.index) {
+        std::cout << "Index 1: " << index.x << ", Index 2: " << index.y << ", Index 3: " << index.z << std::endl;
+    }
+}
+
+
+
+ 
 
 
 struct Element {
-    std::vector<int3> triangles;
+    std::vector<Triangle> triangles;
     int elemID;
 
     // Function to fill the triangles based on input indices
@@ -122,20 +139,20 @@ struct Element {
         }
 
         // Create the four triangles based on the indices
-        int3 triangle1;
-        triangle1 = { indices[0], indices[2], indices[1] };
+        Triangle triangle1;
+        triangle1.index = { indices[0], indices[1], indices[2] };
         triangles.push_back(triangle1);
 
-        int3 triangle2;
-        triangle2 = { indices[0], indices[1], indices[3] };
+        Triangle triangle2;
+        triangle2.index = { indices[0], indices[3], indices[1] };
         triangles.push_back(triangle2);
 
-        int3 triangle3;
-        triangle3 = { indices[1], indices[2], indices[3] };
+        Triangle triangle3;
+        triangle3.index = { indices[1], indices[3], indices[2] };
         triangles.push_back(triangle3);
 
-        int3 triangle4;
-        triangle4 = { indices[2], indices[0], indices[3] };
+        Triangle triangle4;
+        triangle4.index = { indices[2], indices[3], indices[0] };
         triangles.push_back(triangle4);
     }
 };
@@ -152,27 +169,18 @@ bool areTrianglesEqual(const int3& triangle1, const int3& triangle2) {
 
 void fillFaceBuffer(const std::vector<Element>& elements, std::vector<Face>& faceBuffer) {
     for (const Element& element : elements) {
-        for (const int3& index : element.triangles) {
+        for (const Triangle& triangle : element.triangles) {
             bool found = false;
             for (Face& face : faceBuffer) {
-                if (areTrianglesEqual(index, face.index)) {
-                    if (face.elemIDs.y == -1) {
-                        face.elemIDs.y = element.elemID;
-                    } else {
-                        // Duplicate triangle found, create a new face entry
-                        Face newFace;
-                        newFace.index = index;
-                        newFace.elemIDs.x = element.elemID;
-                        newFace.elemIDs.y = -1;
-                        faceBuffer.push_back(newFace);
-                    }
+                if (areTrianglesEqual(triangle.index, face.index)) {
+                    face.elemIDs.y = element.elemID;
                     found = true;
                     break;
                 }
             }
             if (!found) {
                 Face newFace;
-                newFace.index = index;
+                newFace.index = triangle.index;
                 newFace.elemIDs.x = element.elemID;
                 newFace.elemIDs.y = -1;
                 faceBuffer.push_back(newFace);
@@ -180,6 +188,8 @@ void fillFaceBuffer(const std::vector<Element>& elements, std::vector<Face>& fac
         }
     }
 }
+
+
 
 
 
@@ -241,8 +251,6 @@ struct WhittedState
     OptixProgramGroup           occlusion_miss_prog_group = 0;
     OptixProgramGroup           sphere_hit_prog_group  = 0;
     OptixProgramGroup           mesh_hit_prog_group = 0;
-    OptixProgramGroup           mesh_hit_prog_group2 = 0;
-
 
     OptixPipeline               pipeline                  = 0;
     OptixPipelineCompileOptions pipeline_compile_options  = {};
@@ -260,11 +268,7 @@ struct WhittedState
 //
 //------------------------------------------------------------------------------
 
-// Metal sphere, glass sphere, floor, light
-const Sphere g_sphere = {
-    { 2.0f, 1.5f, -2.5f }, // center
-    1.0f                   // radius
-};
+// ??? Camera Data???
 
 
 //------------------------------------------------------------------------------
@@ -392,45 +396,11 @@ void initLaunchParams( WhittedState& state )
     state.params.handle = state.gas_handle;
 }
 
-static void sphere_bound(float3 center, float radius, float result[6])
-{
-    OptixAabb *aabb = reinterpret_cast<OptixAabb*>(result);
-
-    float3 m_min = center - radius;
-    float3 m_max = center + radius;
-
-    *aabb = {
-        m_min.x, m_min.y, m_min.z,
-        m_max.x, m_max.y, m_max.z
-    };
-}
 
 
 
 static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas_handle, std::vector<Face> &faceBuffer )
 {   
-    Element element0;
-    element0.fillTriangles({ 0, 1, 2, 3 });
-    element0.elemID = 0;
-
-    std::vector<float3> arr = {{    //on traitera ça à la fin
-    { 0.f, 0.f, 0.0f },
-    { 5.f, 0.f, 0.0f},
-    { 0.0f, 5.f, 0.f},
-    { 0.0f, 0.f, 5.f},
-    {0.f, -5.f,  0.f},
-    {-5.f, 0.f, 0.f} ,
-    {0.f, 0.f, -5.f},
-    {5.f, 5.f, 5.f }
-        }};
-
-
-    TriangleMesh model1;
-    model1.index = element0.triangles;
-    model1.vertex = arr;
-
-    fillFaceBuffer({element0}, faceBuffer); 
-
     /*! the model we are going to trace rays against */
     std::vector<TriangleMesh> meshes;
     /*! one buffer per input mesh */
@@ -441,13 +411,22 @@ static void buildTriangle(const WhittedState &state, OptixTraversableHandle &gas
     //CUDABuffer asBuffer;
 
 
-    // TriangleMesh model1;
-    // model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
+    TriangleMesh model1;
+    model1.addCube(make_float3(-0.f, 0.f, -0.f), make_float3(2.f, 2.f, -2.f));
 
     TriangleMesh model2;
-    model2.addCube(make_float3(0.f, 0.f, 6.f), make_float3(6.f, 6.f, 0.f));
+    model2.addCube(make_float3(-2.f, 2.f, 2.f), make_float3(0.f, 4.f, 0.f));
 
-    meshes.push_back(model1);
+    TriangleMesh triangle;
+     // Adding the vertices
+    triangle.vertex.push_back({0, 0, 0});
+    triangle.vertex.push_back({5, 0, 0});
+    triangle.vertex.push_back({0, 5, 0});
+
+    // Adding the index
+    triangle.index.push_back({0, 1, 2});
+
+    meshes.push_back(triangle);
    // meshes.push_back(model2);
 
     
@@ -629,34 +608,6 @@ static void createCameraProgram( WhittedState &state, std::vector<OptixProgramGr
 
 
 
-static void createMetalSphereProgram( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
-{
-    OptixProgramGroup           sphere_hit_prog_group;
-    OptixProgramGroupOptions    sphere_hit_prog_group_options = {};
-    OptixProgramGroupDesc       sphere_hit_prog_group_desc = {};
-    sphere_hit_prog_group_desc.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
-        sphere_hit_prog_group_desc.hitgroup.moduleIS           = state.shading_module;
-    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameIS    = "__intersection__sphere";
-    sphere_hit_prog_group_desc.hitgroup.moduleCH               = state.shading_module;
-    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameCH    = "__closesthit__metal_radiance";
-    sphere_hit_prog_group_desc.hitgroup.moduleAH               = nullptr;
-    sphere_hit_prog_group_desc.hitgroup.entryFunctionNameAH    = nullptr;
-
-    char    log[2048];
-    size_t  sizeof_log = sizeof( log );
-    OPTIX_CHECK_LOG( optixProgramGroupCreate(
-        state.context,
-        &sphere_hit_prog_group_desc,
-        1,
-        &sphere_hit_prog_group_options,
-        log,
-        &sizeof_log,
-        &sphere_hit_prog_group ) );
-
-    program_groups.push_back(sphere_hit_prog_group);
-    state.sphere_hit_prog_group = sphere_hit_prog_group;  
-}
-
 
 static void createMeshProgram( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
 {
@@ -684,34 +635,6 @@ static void createMeshProgram( WhittedState &state, std::vector<OptixProgramGrou
 
     program_groups.push_back(mesh_hit_prog_group);
     state.mesh_hit_prog_group = mesh_hit_prog_group;  
-}
-
-static void createMeshProgram2( WhittedState &state, std::vector<OptixProgramGroup> &program_groups )
-{
-    OptixProgramGroup           mesh_hit_prog_group2;
-    OptixProgramGroupOptions    mesh_hit_prog_group_options2 = {};
-    OptixProgramGroupDesc       mesh_hit_prog_group_desc2 = {};
-    mesh_hit_prog_group_desc2.kind   = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
-    mesh_hit_prog_group_desc2.hitgroup.moduleCH               = state.shading_module;
-    mesh_hit_prog_group_desc2.hitgroup.entryFunctionNameCH    = "__closesthit__mesh2";
-    mesh_hit_prog_group_desc2.hitgroup.moduleIS               = nullptr;
-    mesh_hit_prog_group_desc2.hitgroup.entryFunctionNameIS    = nullptr;
-    mesh_hit_prog_group_desc2.hitgroup.moduleAH               = nullptr;
-    mesh_hit_prog_group_desc2.hitgroup.entryFunctionNameAH    = nullptr;
-
-     char    log[2048];
-    size_t  sizeof_log = sizeof( log );
-    OPTIX_CHECK_LOG( optixProgramGroupCreate(
-        state.context,
-        &mesh_hit_prog_group_desc2,
-        1,
-        &mesh_hit_prog_group_options2,
-        log,
-        &sizeof_log,
-        &mesh_hit_prog_group2 ) );
-
-    program_groups.push_back(mesh_hit_prog_group2);
-    state.mesh_hit_prog_group2 = mesh_hit_prog_group2;  
 }
 
 
@@ -769,7 +692,7 @@ void createPipeline( WhittedState &state )
     createModules( state );
     createCameraProgram( state, program_groups );
     createMeshProgram( state, program_groups );
-    createMeshProgram2( state, program_groups );
+   // createMetalSphereProgram( state, program_groups );
     createMissProgram( state, program_groups );
 
     // Link program groups to pipeline
@@ -866,23 +789,40 @@ void createSBT( WhittedState &state , const std::vector<Face> &faces )
 
      
     {
-       
-        CUDABuffer faceBuffer;
-        faceBuffer.alloc_and_upload(faces);
+        // CUDABuffer hitgroupRecordsBuffer;
 
+        // std::vector<HitGroupSbtRecord> hitgroupRecords;
 
-        CUDABuffer hitgroupRecordsBuffer;
+        // HitGroupSbtRecord rec1;
+        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec1));
+        // hitgroupRecords.push_back(rec1);
+
+        // HitGroupSbtRecord rec2;
+        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec2));
+        // hitgroupRecords.push_back(rec2);
+
+        // hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
+
+        // state.sbt.hitgroupRecordBase          = hitgroupRecordsBuffer.d_pointer();
+        // state.sbt.hitgroupRecordStrideInBytes = sizeof(HitGroupSbtRecord);
+        // state.sbt.hitgroupRecordCount         = (int)hitgroupRecords.size();
+        
+        // CUDABuffer faceBuffer;
+        // faceBuffer.alloc_and_upload(faces);
+
+       ///  
+
+         CUDABuffer hitgroupRecordsBuffer;
 
         std::vector<HitGroupSbtRecord> hitgroupRecords;
 
         HitGroupSbtRecord rec1;
-        rec1.data.face = (Face*)faceBuffer.d_pointer();
-        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group2, &rec1));
+        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec1));
         hitgroupRecords.push_back(rec1);
 
-        // HitGroupSbtRecord rec2;
-        // OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group2, &rec2));
-        // hitgroupRecords.push_back(rec2);
+        HitGroupSbtRecord rec2;
+        OPTIX_CHECK(optixSbtRecordPackHeader(state.mesh_hit_prog_group, &rec2));
+        hitgroupRecords.push_back(rec2);
 
         hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
 
@@ -1096,7 +1036,7 @@ int main( int argc, char* argv[] )
 
         createContext  ( state );
 
-       // buildMesh( state, state.gas_handle, state.d_gas_output_buffer);
+       
 
         buildTriangle(state, state.gas_handle, faces);
   

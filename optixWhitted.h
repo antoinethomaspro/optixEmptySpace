@@ -36,6 +36,7 @@ struct Triangle {
     int3 index;
 };
 
+
 struct Face {
     int3 index;
     int2 elemIDs;
