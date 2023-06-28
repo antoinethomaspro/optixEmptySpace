@@ -59,38 +59,49 @@ extern "C" __global__ void __raygen__pinhole_camera()
 
     float distance = -5.f;
 
-    int tost;
+    int tost = 9;
+
+    float tmin = 0.f;
 
     
+    while( tost == 9 )
+    {
+      //OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
+      //OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+
+      unsigned int payloadDistance = __float_as_uint(distance);
+      unsigned int payloadTost = 0;
+
+
+      optixTrace(
+                  params.handle, // handle
+                  ray_origin,           // float3 rayOrigin
+                  ray_direction, // float3 rayDirection
+                  tmin,           // float tmin
+                  1e16f,         // float tmax
+                  0.0f,          // float rayTime
+                  OptixVisibilityMask(1),
+                  OPTIX_RAY_FLAG_NONE,
+                  0,                 // SBT offset (1 = CH2)
+                  RAY_TYPE_COUNT,    // SBT stride
+                  RAY_TYPE_RADIANCE, // missSBTIndex
+                  float3_as_args(payload_rgb),
+                  payloadTost,
+                  payloadDistance
+                  );
+
+      
+      distance = __uint_as_float(payloadDistance);
+
+      tmin += distance + 0.001;
+
+      
+
+      tost = payloadTost;
+
+      }
+
     
-
-    //OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
-    //OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-
-    unsigned int payloadDistance = __float_as_uint(distance);
-    unsigned int payloadTost = 0;
-
-     optixTrace(
-                params.handle, // handle
-                ray_origin,           // float3 rayOrigin
-                ray_direction, // float3 rayDirection
-                0.f,           // float tmin
-                1e16f,         // float tmax
-                0.0f,          // float rayTime
-                OptixVisibilityMask(1),
-                OPTIX_RAY_FLAG_NONE,
-                0,                 // SBT offset (1 = CH2)
-                RAY_TYPE_COUNT,    // SBT stride
-                RAY_TYPE_RADIANCE, // missSBTIndex
-                float3_as_args(payload_rgb),
-                payloadTost,
-                payloadDistance
-                );
-
-    
-    distance = __uint_as_float(payloadDistance);
-
-    tost = payloadTost;
 
     
     params.frame_buffer[image_index] = make_color(payload_rgb);
