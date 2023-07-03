@@ -152,70 +152,21 @@ extern "C" __global__ void __raygen__pinhole_camera()
     float3 position = ray_origin;
     float3 pos;
 
-    float distanceMin;
-    float distanceMax;
+    float distanceMin = 0.f;
+    float distanceMax = 20.f;
 
     int tost;
 
     float tmin;
 
-    for (int a = 0; a < 1; a+=1){
-
-        distanceMin = -1.f;
-        distanceMax = -1.f;
-
-        unsigned int payload = __float_as_uint(distanceMin);
-        unsigned int payloadtest1 = 0;
-
-        optixTrace(
-            params.handle, // handle
-            position,       // float3 rayOrigin
-            ray_direction,  // float3 rayDirection
-            0.f,            // float tmin
-            1e16f,          // float tmax
-            0.0f,           // float rayTime
-            OptixVisibilityMask(1),
-            OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-            1,                 // SBT offset (1 = CH2)
-            RAY_TYPE_COUNT,    // SBT stride
-            RAY_TYPE_RADIANCE, // missSBTIndex
-            payload);
-
-        distanceMin = __uint_as_float(payload);
-
-        payload = __float_as_uint(distanceMax);
-        optixTrace(
-            params.handle, // handle
-            position,       // float3 rayOrigin
-            ray_direction,  // float3 rayDirection
-            0.f,            // float tmin
-            1e16f,          // float tmax
-            0.0f,           // float rayTime
-            OptixVisibilityMask(1),
-            OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
-            1,                 // SBT offset (1 = CH2)
-            RAY_TYPE_COUNT,    // SBT stride
-            RAY_TYPE_RADIANCE, // missSBTIndex
-            payload,
-            payloadtest1);
-
-        distanceMax = __uint_as_float(payload);
-        tost = payloadtest1;
-
-        // if (params.subframe_index == 0 &&
-        //     tost == 2 &&
-        //     optixGetLaunchIndex().x == 0 &&
-        //     optixGetLaunchIndex().y == 0)
-        // {
-        //     printf("it's working!\n");
-        // }
+   
 
         for (float distance = distanceMin; distance < distanceMax; distance += 0.1)
         {
             pos = position + ray_direction * distance;
 
             optixTrace(
-                params.handle, // handle
+                params.handle2, // handle
                 pos,           // float3 rayOrigin
                 ray_direction, // float3 rayDirection
                 0.f,           // float tmin
@@ -232,7 +183,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
         position += ray_direction * distanceMax; // ok
 
     
-   }
+   
 
     params.frame_buffer[image_index] = make_color(payload_rgb);
 }
