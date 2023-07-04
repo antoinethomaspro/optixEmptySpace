@@ -150,22 +150,20 @@ extern "C" __global__ void __raygen__pinhole_camera()
 
     float3 payload_rgb = make_float3(0.f, 0.f, 0.f);
     float3 position = ray_origin;
-    float3 pos;
 
-    float distanceMin;
-    float distanceMax;
 
-    int tost;
+    float distanceMin = 1.f;
+    float distanceMax = 1.f;
 
-    float tmin;
 
-    for (int a = 0; a < 1; a+=1){
+        while(distanceMax > 0.f)
+    // for(int i = 0; i < 3; i++)
+    {
 
         distanceMin = -1.f;
         distanceMax = -1.f;
 
         unsigned int payload = __float_as_uint(distanceMin);
-        unsigned int payloadtest1 = 0;
 
         optixTrace(
             params.handle2, // handle
@@ -196,27 +194,20 @@ extern "C" __global__ void __raygen__pinhole_camera()
             1,                 // SBT offset (1 = CH2)
             RAY_TYPE_COUNT,    // SBT stride
             RAY_TYPE_RADIANCE, // missSBTIndex
-            payload,
-            payloadtest1);
+            payload);
 
         distanceMax = __uint_as_float(payload);
-        tost = payloadtest1;
+        //TODO: handle camera inside box
 
-        // if (params.subframe_index == 0 &&
-        //     tost == 2 &&
-        //     optixGetLaunchIndex().x == 0 &&
-        //     optixGetLaunchIndex().y == 0)
-        // {
-        //     printf("it's working!\n");
-        // }
+        if(distanceMin < 0.f){break;}
 
         for (float distance = distanceMin; distance < distanceMax; distance += 0.1)
         {
-            pos = position + ray_direction * distance;
+            float3 secondRay_origin = position + ray_direction * distance;
 
             optixTrace(
                 params.handle, // handle
-                pos,           // float3 rayOrigin
+                secondRay_origin,           // float3 rayOrigin
                 ray_direction, // float3 rayDirection
                 0.f,           // float tmin
                 1e16f,         // float tmax
@@ -229,9 +220,8 @@ extern "C" __global__ void __raygen__pinhole_camera()
                 float3_as_args(payload_rgb));
         }
 
-        position += ray_direction * distanceMax; // ok
+        position += ray_direction * (distanceMax + 0.01); // ok
 
-    
    }
 
     params.frame_buffer[image_index] = make_color(payload_rgb);

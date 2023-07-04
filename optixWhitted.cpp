@@ -590,11 +590,13 @@ static void buildBox(const WhittedState &state, OptixTraversableHandle &gas_hand
     model2.addCube(make_float3(0.f, 0.f, -4.f), make_float3(5.f, 5.f, -9.f));
 
     TriangleMesh model3; //big box
-    model3.addCube(make_float3(0.f, 0.f, 5.f), make_float3(5.f, 5.f, -9.f));
+    model3.addCube(make_float3(0.f, 0.f, -4.f), make_float3(5.f, 5.f, -9.f));
+    model3.addCube(make_float3(0.f, 0.f, 5.f), make_float3(5.f, 5.f, 0.f));
+    //model3.addCube(make_float3(0.f, 0.f, 5.f), make_float3(5.f, 5.f, -9.f));
 
-   meshes.push_back(model3);
-   //meshes.push_back(model1);
-   //meshes.push_back(model2);
+    meshes.push_back(model3);
+//    meshes.push_back(model1);
+//    meshes.push_back(model2);
 
     
     vertexBuffer.resize(meshes.size());
