@@ -64,8 +64,8 @@ extern "C" __global__ void __raygen__pinhole_camera()
     float tmin = 0.f;
 
     
-    while( tost == 9 )
-    {
+    // while( tost == 9 )
+    // {
       //OPTIX_RAY_FLAG_CULL_FRONT_FACING_TRIANGLES,
       //OPTIX_RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 
@@ -99,7 +99,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
 
       tost = payloadTost;
 
-      }
+     // }
 
     
 
