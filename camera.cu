@@ -168,7 +168,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
         unsigned int payloadtest1 = 0;
 
         optixTrace(
-            params.handle, // handle
+            params.handle2, // handle
             position,       // float3 rayOrigin
             ray_direction,  // float3 rayDirection
             0.f,            // float tmin
@@ -185,7 +185,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
 
         payload = __float_as_uint(distanceMax);
         optixTrace(
-            params.handle, // handle
+            params.handle2, // handle
             position,       // float3 rayOrigin
             ray_direction,  // float3 rayDirection
             0.f,            // float tmin
