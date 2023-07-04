@@ -114,17 +114,21 @@ extern "C" __global__ void __closesthit__mesh()
 extern "C" __global__ void __closesthit__mesh2() //handle primary rays
 {
 
-    // float3  payload = getPayload();
+    const int primID = optixGetPrimitiveIndex();
+    
+    if (optixIsTriangleBackFaceHit() == false) {
+         setPayload(  make_float3( 1.0f, 0.f, 0.f));
+    }
+    else { setPayload(  make_float3( 0.f, 0.f, 0.f));}
 
-    // if(optixIsTriangleBackFaceHit() ==true)
-    //     {  setPayload( payload + make_float3( 0.f, 0.1f, 0.f));}
-    //     else{return;}
+    int a = 9;
 
-    float tmax = optixGetRayTmax ();
-    int a = 2;
+    float tmax; //le convertir en int directement? 
 
-    optixSetPayload_0( float_as_int( tmax ) );
-    optixSetPayload_1(a);
+    tmax = optixGetRayTmax ();
+
+    optixSetPayload_3(a);
+    optixSetPayload_4( float_as_int( tmax ) );
     
 
     
