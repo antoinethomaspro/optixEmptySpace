@@ -100,13 +100,6 @@ extern "C" __global__ void __closesthit__mesh()
             break;
      }
 
-    // float3  payload = getPayload();
-    // const int primID = optixGetPrimitiveIndex();
-
-    // if(optixIsTriangleBackFaceHit() ==true)
-    //     {  setPayload( payload + make_float3( 0.1f, 0.f, 0.f));}
-    //     else{return;}
-
   
 }
 

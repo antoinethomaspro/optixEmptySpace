@@ -149,7 +149,9 @@ extern "C" __global__ void __raygen__pinhole_camera()
     /*-------- LA PARTIE INTERESSANTE COMMENCE ICI -------*/
 
     float3 payload_rgb = make_float3(0.f, 0.f, 0.f);
-    float3 position = ray_origin;
+    float3 position_min = ray_origin;
+    float3 position_max = ray_origin;
+
 
 
     float distanceMin = 1.f;
@@ -167,7 +169,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
 
         optixTrace(
             params.handle2, // handle
-            position,       // float3 rayOrigin
+            position_min,       // float3 rayOrigin
             ray_direction,  // float3 rayDirection
             0.f,            // float tmin
             1e16f,          // float tmax
@@ -184,7 +186,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
         payload = __float_as_uint(distanceMax);
         optixTrace(
             params.handle2, // handle
-            position,       // float3 rayOrigin
+            position_max,       // float3 rayOrigin
             ray_direction,  // float3 rayDirection
             0.f,            // float tmin
             1e16f,          // float tmax
@@ -203,7 +205,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
 
         for (float distance = distanceMin; distance < distanceMax; distance += 0.1)
         {
-            float3 secondRay_origin = position + ray_direction * distance;
+            float3 secondRay_origin = position_min + ray_direction * distance;
 
             optixTrace(
                 params.handle, // handle
@@ -220,7 +222,8 @@ extern "C" __global__ void __raygen__pinhole_camera()
                 float3_as_args(payload_rgb));
         }
 
-        position += ray_direction * (distanceMax + 0.01); // ok
+        position_min += ray_direction * (distanceMax - 0.01); // ok
+        position_max += ray_direction * (distanceMax + 0.01); // ok
 
    }
 
