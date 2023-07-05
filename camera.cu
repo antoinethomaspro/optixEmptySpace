@@ -160,7 +160,7 @@ extern "C" __global__ void __raygen__pinhole_camera()
     int a = 1;
 
 
-       while(distanceMin > 0.f)
+       while(distanceMax > 0.f)
       
     {
 
