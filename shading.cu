@@ -106,7 +106,6 @@ extern "C" __global__ void __closesthit__mesh()
 
 extern "C" __global__ void __closesthit__mesh2() //handle primary rays
 {
-    
 
     float tmax = optixGetRayTmax ();
 

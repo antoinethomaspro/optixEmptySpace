@@ -157,15 +157,18 @@ extern "C" __global__ void __raygen__pinhole_camera()
     float distanceMin = 1.f;
     float distanceMax = 1.f;
 
+    int a = 1;
 
-        while(distanceMax > 0.f)
-    // for(int i = 0; i < 3; i++)
+
+       while(distanceMin > 0.f)
+      
     {
 
         distanceMin = -1.f;
         distanceMax = -1.f;
 
         unsigned int payload = __float_as_uint(distanceMin);
+        unsigned int payloadTost = 0;
 
         optixTrace(
             params.handle2, // handle
@@ -180,6 +183,8 @@ extern "C" __global__ void __raygen__pinhole_camera()
             RAY_TYPE_COUNT,    // SBT stride
             RAY_TYPE_RADIANCE, // missSBTIndex
             payload);
+
+
 
         distanceMin = __uint_as_float(payload);
 
@@ -201,11 +206,12 @@ extern "C" __global__ void __raygen__pinhole_camera()
         distanceMax = __uint_as_float(payload);
         //TODO: handle camera inside box
 
-        if(distanceMin < 0.f){break;}
+       // if(distanceMin < 0.f){break;}
+        if(distanceMin >= distanceMax){distanceMin = 0.f;}
 
         for (float distance = distanceMin; distance < distanceMax; distance += 0.1)
         {
-            float3 secondRay_origin = position_min + ray_direction * distance;
+            float3 secondRay_origin = position_min + ray_direction * distance; //should we add back the epsilon to be exact? 
 
             optixTrace(
                 params.handle, // handle
